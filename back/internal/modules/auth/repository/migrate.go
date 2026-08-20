@@ -16,6 +16,10 @@ func Migrate(db *gorm.DB) error {
 		&RoleModel{},
 		&UserRoleModel{},
 		&SessionModel{},
+		&RegionModel{},
+		&DepartmentModel{},
+		&UserRegionModel{},
+		&UserDepartmentModel{},
 	)
 }
 
