@@ -1,0 +1,7 @@
+node_modules/
+.pnpm-store/
+.nuxt/
+.output/
+.data/
+graphify-out/
+.claude/settings.local.json

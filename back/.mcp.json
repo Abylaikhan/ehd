@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "graphify": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/yasinyaman/graphify-mcp", "graphify-mcp-server"],
+      "env": {
+        "GRAPHIFY_PROJECT_DIR": "/Users/ablsdu/Developer/projects/sites/ehd2/back",
+        "GRAPHIFY_OUT_DIR": "/Users/ablsdu/Developer/projects/sites/ehd2/back/graphify-out"
+      }
+    },
+    "git": {
+      "command": "uvx",
+      "args": ["mcp-server-git", "--repository", "/Users/ablsdu/Developer/projects/sites/ehd2"]
+    },
+    "docker": {
+      "command": "uvx",
+      "args": ["docker-mcp"]
+    },
+    "jetbrains": {
+      "command": "npx",
+      "args": ["-y", "@jetbrains/mcp-proxy"]
+    }
+  }
+}

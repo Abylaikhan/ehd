@@ -1,0 +1,40 @@
+{
+  "enableAllProjectMcpServers": true,
+  "permissions": {
+    "allow": [
+      "mcp__graphify",
+      "mcp__git",
+      "mcp__docker",
+      "mcp__jetbrains",
+      "Read",
+      "Edit",
+      "Write",
+      "Bash(go build:*)",
+      "Bash(go test:*)",
+      "Bash(go vet:*)",
+      "Bash(go run:*)",
+      "Bash(go mod:*)",
+      "Bash(gofmt:*)",
+      "Bash(docker compose -f docker-compose.dev.yml ps:*)",
+      "Bash(docker compose -f docker-compose.dev.yml logs:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(git push:*)",
+      "Bash(docker compose -f docker-compose.dev.yml down:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/redirect-to-graphify.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

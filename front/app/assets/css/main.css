@@ -1,0 +1,48 @@
+/* Дизайн-токены ЕХД. Компоненты используют var(--ehd-*), inline-стили запрещены (ТЗ). */
+:root {
+  --ehd-brand: #0b2545;
+
+  /* Плоскости и чернила */
+  --ehd-page: #f4f6f9;
+  --ehd-surface: #ffffff;
+  --ehd-ink: #0b0b0b;
+  --ehd-ink-2: #52514e;
+  --ehd-muted: #898781;
+  --ehd-border: #e2e7ee;
+
+  /* Статусная палитра (зарезервирована, всегда с иконкой и подписью) */
+  --ehd-good: #0ca30c;
+  --ehd-good-soft: #e6f4e6;
+  --ehd-warning: #b9820a;
+  --ehd-warning-soft: #fbf1d8;
+  --ehd-critical: #d03b3b;
+  --ehd-critical-soft: #f8e5e5;
+  --ehd-unknown: #8592a6;
+  --ehd-unknown-soft: #eef1f5;
+
+  /* Форма */
+  --ehd-radius: 12px;
+  --ehd-radius-sm: 8px;
+  --ehd-gap: 1rem;
+  --ehd-shadow-sm: 0 1px 2px rgba(11, 37, 69, 0.06), 0 1px 3px rgba(11, 37, 69, 0.07);
+  --ehd-shadow-md: 0 6px 20px rgba(11, 37, 69, 0.09);
+}
+
+html,
+body,
+#__nuxt {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: var(--ehd-page);
+  color: var(--ehd-ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}

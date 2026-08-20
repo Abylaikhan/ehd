@@ -1,0 +1,122 @@
+// Package app — composition root ЕХД: wiring платформы и модулей,
+// AutoMigrate, запуск HTTP-сервера и graceful shutdown.
+package app
+
+import (
+	"context"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/gofiber/fiber/v2"
+	"go.uber.org/zap"
+
+	"ehd-api/config"
+	authrepo "ehd-api/internal/modules/auth/repository"
+	authhttp "ehd-api/internal/modules/auth/transport/http"
+	reporterrepo "ehd-api/internal/modules/reporter/repository"
+	reporterhttp "ehd-api/internal/modules/reporter/transport/http"
+	"ehd-api/pkg/clickhouse"
+	"ehd-api/pkg/httpserver"
+	"ehd-api/pkg/logger"
+	"ehd-api/pkg/postgres"
+)
+
+func Run(cfg *config.Config) error {
+	log, err := logger.New(cfg.Log.Level)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = log.Sync() }()
+
+	// --- PostgreSQL + AutoMigrate ---
+	db, err := postgres.New(cfg.PG.DSN)
+	if err != nil {
+		return err
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+	defer sqlDB.Close()
+
+	if err := postgres.EnsureSchemas(db, "auth", "reporter"); err != nil {
+		return err
+	}
+	if err := authrepo.Migrate(db); err != nil {
+		return err
+	}
+	if err := reporterrepo.Migrate(db); err != nil {
+		return err
+	}
+	log.Info("automigrate complete")
+
+	if cfg.Admin.Password != "" {
+		if err := authrepo.SeedAdmin(db, cfg.Admin.Login, cfg.Admin.Email, cfg.Admin.Password); err != nil {
+			return err
+		}
+		log.Info("admin seeded", zap.String("login", cfg.Admin.Login))
+	}
+
+	// --- ClickHouse (read-only источник Reporter) ---
+	ch, err := clickhouse.New(cfg.CH)
+	if err != nil {
+		return err
+	}
+	defer ch.Close()
+
+	// --- HTTP (fiber) ---
+	app := httpserver.New(cfg, log)
+
+	// liveness — без внешних зависимостей; readiness — с проверкой критических подключений
+	app.Get("/livez", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"status": "ok"})
+	})
+	app.Get("/readyz", func(c *fiber.Ctx) error {
+		ctx, cancel := context.WithTimeout(c.UserContext(), 5*time.Second)
+		defer cancel()
+
+		checks := fiber.Map{"postgres": "ok", "clickhouse": "ok"}
+		status := fiber.StatusOK
+		if err := sqlDB.PingContext(ctx); err != nil {
+			checks["postgres"] = "unavailable"
+			status = fiber.StatusServiceUnavailable
+		}
+		if err := ch.Ping(ctx); err != nil {
+			checks["clickhouse"] = "unavailable"
+			status = fiber.StatusServiceUnavailable
+		}
+		return c.Status(status).JSON(checks)
+	})
+
+	api := app.Group("/api/v1")
+	authhttp.Register(api.Group("/auth"))
+	reporterhttp.Register(api.Group("/reporter"))
+
+	// --- запуск + graceful shutdown ---
+	errCh := make(chan error, 1)
+	go func() {
+		log.Info("server started", zap.String("port", cfg.HTTP.Port), zap.String("env", cfg.App.Env))
+		errCh <- app.Listen(":" + cfg.HTTP.Port)
+	}()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case err := <-errCh:
+		return err
+	case sig := <-stop:
+		log.Info("shutting down", zap.String("signal", sig.String()))
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		// ShutdownWithContext закрывает listener и ждёт завершения активных соединений
+		if err := app.ShutdownWithContext(ctx); err != nil {
+			return err
+		}
+		log.Info("shutdown complete")
+	}
+
+	return nil
+}
