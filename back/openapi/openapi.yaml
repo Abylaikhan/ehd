@@ -1,0 +1,375 @@
+openapi: 3.1.0
+info:
+  title: ЕХД API — Auth Module
+  version: 0.1.0
+  description: >
+    Аутентификация, сессии, пользователи, роли и профиль доступа ЕХД.
+    Все ответы содержат request_id; ошибки — единый контракт Error.
+servers:
+  - url: /api/v1
+
+tags:
+  - name: auth
+  - name: auth-admin
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: ehd_session
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    Error:
+      type: object
+      required: [request_id, error]
+      properties:
+        request_id: { type: string }
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field: { type: string }
+                  reason: { type: string }
+    RegisterRequest:
+      type: object
+      required: [login, password, iin, full_name, email]
+      properties:
+        login: { type: string }
+        password: { type: string, description: "≥8, заглавная, строчная, цифра" }
+        iin: { type: string, description: "12 цифр" }
+        full_name: { type: string }
+        email: { type: string }
+        phone: { type: string }
+    LoginRequest:
+      type: object
+      required: [login, password]
+      properties:
+        login: { type: string }
+        password: { type: string }
+    LoginResponse:
+      type: object
+      properties:
+        user_id: { type: string, format: uuid }
+        login: { type: string }
+        expires_at: { type: string, format: date-time }
+        password_change_required: { type: boolean }
+    Me:
+      type: object
+      properties:
+        user_id: { type: string, format: uuid }
+        login: { type: string }
+        is_admin: { type: boolean }
+        roles: { type: array, items: { type: string } }
+        region_codes: { type: array, items: { type: string } }
+        department_codes: { type: array, items: { type: string } }
+    ChangePasswordRequest:
+      type: object
+      required: [old_password, new_password]
+      properties:
+        old_password: { type: string }
+        new_password: { type: string }
+    EdsChallengeResponse:
+      type: object
+      properties:
+        challenge: { type: string }
+    EdsVerifyRequest:
+      type: object
+      required: [challenge, signed_data]
+      properties:
+        challenge: { type: string }
+        signed_data: { type: string, description: "Sandbox stub: IIN|BIN|FullName" }
+    UserView:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        login: { type: string }
+        email: { type: string }
+        full_name: { type: string }
+        iin_masked: { type: string }
+        iin_verified: { type: boolean }
+        status: { type: string, enum: [pending, active, blocked] }
+        failed_attempts: { type: integer }
+        roles: { type: array, items: { type: string } }
+        region_codes: { type: array, items: { type: string } }
+        department_codes: { type: array, items: { type: string } }
+        created_at: { type: string, format: date-time }
+    UserList:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/UserView' } }
+        total_count: { type: integer }
+        page: { type: integer }
+        page_size: { type: integer }
+    UpdateUserRequest:
+      type: object
+      properties:
+        iin_verified: { type: boolean }
+        status: { type: string, enum: [pending, active, blocked] }
+        role_ids: { type: array, items: { type: string, format: uuid } }
+        region_ids: { type: array, items: { type: string, format: uuid } }
+        department_ids: { type: array, items: { type: string, format: uuid } }
+    Role:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name_ru: { type: string }
+        name_kk: { type: string }
+        status: { type: string }
+    CreateRoleRequest:
+      type: object
+      required: [code, name_ru]
+      properties:
+        code: { type: string }
+        name_ru: { type: string }
+        name_kk: { type: string }
+    Reference:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name_ru: { type: string }
+        name_kk: { type: string }
+        status: { type: string }
+
+  responses:
+    ErrorResponse:
+      description: Ошибка
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+paths:
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Самостоятельная регистрация (статус pending)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201':
+          description: Создан
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_id: { type: string, format: uuid }
+                  status: { type: string }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+        '422': { $ref: '#/components/responses/ErrorResponse' }
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Вход по логину и паролю
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: OK; устанавливает cookie ehd_session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
+        '401': { $ref: '#/components/responses/ErrorResponse' }
+        '403': { $ref: '#/components/responses/ErrorResponse' }
+  /auth/eds/challenge:
+    post:
+      tags: [auth]
+      summary: Одноразовый challenge для NCALayer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EdsChallengeResponse' }
+  /auth/eds/verify:
+    post:
+      tags: [auth]
+      summary: Проверка подписи ЭЦП и вход/регистрация
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EdsVerifyRequest' }
+      responses:
+        '200':
+          description: OK; устанавливает cookie ehd_session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
+        '400': { $ref: '#/components/responses/ErrorResponse' }
+        '401': { $ref: '#/components/responses/ErrorResponse' }
+  /auth/me:
+    get:
+      tags: [auth]
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      summary: Текущая личность (Identity)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Me' }
+        '401': { $ref: '#/components/responses/ErrorResponse' }
+  /auth/logout:
+    post:
+      tags: [auth]
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      summary: Завершить сессию
+      responses:
+        '204': { description: OK }
+  /auth/change-password:
+    post:
+      tags: [auth]
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      summary: Смена пароля (обязательна для временного)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
+      responses:
+        '204': { description: OK }
+        '401': { $ref: '#/components/responses/ErrorResponse' }
+        '422': { $ref: '#/components/responses/ErrorResponse' }
+  /auth/admin/users:
+    get:
+      tags: [auth-admin]
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      summary: Список пользователей
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: page_size, in: query, schema: { type: integer, default: 50 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserList' }
+        '403': { $ref: '#/components/responses/ErrorResponse' }
+  /auth/admin/users/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [auth-admin]
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      summary: Карточка пользователя
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserView' }
+        '404': { $ref: '#/components/responses/ErrorResponse' }
+    patch:
+      tags: [auth-admin]
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      summary: Проверка ИИН, статус, роли/регионы/подразделения
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateUserRequest' }
+      responses:
+        '204': { description: OK }
+        '409': { $ref: '#/components/responses/ErrorResponse' }
+  /auth/admin/users/{id}/unlock:
+    post:
+      tags: [auth-admin]
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      summary: Разблокировать пользователя
+      responses:
+        '204': { description: OK }
+  /auth/admin/users/{id}/temp-password:
+    post:
+      tags: [auth-admin]
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      summary: Выдать временный пароль (действует TEMP_PASSWORD_TTL)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  temporary_password: { type: string }
+  /auth/admin/roles:
+    get:
+      tags: [auth-admin]
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      summary: Список ролей
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Role' } }
+    post:
+      tags: [auth-admin]
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      summary: Создать пользовательскую роль
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateRoleRequest' }
+      responses:
+        '201':
+          description: Создана
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Role' }
+  /auth/admin/regions:
+    get:
+      tags: [auth-admin]
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      summary: Справочник регионов
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Reference' } }
+  /auth/admin/departments:
+    get:
+      tags: [auth-admin]
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      summary: Справочник подразделений
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Reference' } }
