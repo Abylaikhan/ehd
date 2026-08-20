@@ -39,6 +39,19 @@ services:
       timeout: 3s
       retries: 20
 
+  # Сайдкар проверки ЭЦП (Kalkan): RSA + ГОСТ РК. Нужен при EDS_MODE=ncanode.
+  ncanode:
+    image: malikzh/ncanode
+    ports:
+      - "${NCANODE_HOST_PORT:-14579}:14579"
+    volumes:
+      - ncanode_cache:/app/cache
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:14579/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
   ehd-api:
     build:
       context: ./back
@@ -64,9 +77,15 @@ services:
       TEMP_PASSWORD_TTL: ${TEMP_PASSWORD_TTL:-72h}
       MAX_FAILED_ATTEMPTS: ${MAX_FAILED_ATTEMPTS:-3}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # ЭЦП: stub (sandbox) или ncalayer (реальная проверка CMS по корням НУЦ РК из EDS_TRUST_DIR)
+      EDS_MODE: ${EDS_MODE:-stub}
+      EDS_TRUST_DIR: /app/eds-trust
+      EDS_OCSP_ENABLED: ${EDS_OCSP_ENABLED:-true}
+      NCANODE_URL: http://ncanode:14579
     volumes:
       - ./back:/app
       - gomod:/go/pkg/mod
+      - ./infra/eds-trust:/app/eds-trust:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -81,6 +100,8 @@ services:
       - "${WEB_HOST_PORT:-3000}:3000"
     environment:
       NUXT_API_BASE: http://ehd-api:8080
+      # Режим ЭЦП фронта синхронизирован с бэкендом (EDS_MODE)
+      NUXT_PUBLIC_EDS_MODE: ${EDS_MODE:-stub}
     volumes:
       - ./front:/app
       - webmodules:/app/node_modules
@@ -92,3 +113,4 @@ volumes:
   chdata:
   gomod:
   webmodules:
+  ncanode_cache:

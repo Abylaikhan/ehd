@@ -17,3 +17,8 @@ front/.data/
 # Agent harness
 graphify-out/
 .claude/settings.local.json
+
+# EDS trust store — реальные сертификаты НУЦ РК не коммитим
+infra/eds-trust/*
+!infra/eds-trust/README.md
+!infra/eds-trust/.gitkeep
