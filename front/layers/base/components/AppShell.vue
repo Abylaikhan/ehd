@@ -1,37 +1,59 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
 
-// Каркас ЕХД: левая сворачиваемая навигация (бренд-navy) + верхняя панель + рабочая область.
-// Пока пункты статичные; позже дерево приходит из GET /api/v1/reporter/navigation.
+// Каркас ЕХД: левая навигация (бренд-navy) + верхняя панель + рабочая область.
+// Состав навигации зависит от прав пользователя (session store).
 const route = useRoute()
+const session = useSessionStore()
+const auth = useAuth()
 const collapsed = ref(false)
 
-const sections = [
-  {
-    title: 'Обзор',
-    items: [{ label: 'Панель мониторинга', icon: 'pi pi-th-large', to: '/' }],
-  },
-  {
-    title: 'Reporter',
-    items: [{ label: 'Витрины', icon: 'pi pi-table', to: '/reporter' }],
-  },
-]
+const sections = computed(() => {
+  const list = [
+    { title: 'Обзор', items: [{ label: 'Панель мониторинга', icon: 'pi pi-th-large', to: '/' }] },
+    { title: 'Reporter', items: [{ label: 'Витрины', icon: 'pi pi-table', to: '/reporter' }] },
+  ]
+  if (session.isAdmin) {
+    list.push({
+      title: 'Администрирование',
+      items: [
+        { label: 'Пользователи', icon: 'pi pi-users', to: '/reporter/admin/users' },
+        { label: 'Роли', icon: 'pi pi-id-card', to: '/reporter/admin/roles' },
+      ],
+    })
+  }
+  return list
+})
 
 const isActive = (to: string) => (to === '/' ? route.path === '/' : route.path.startsWith(to))
 
-const userMenu = ref()
-const userItems = [
-  { label: 'Профиль', icon: 'pi pi-user' },
-  { label: 'Настройки', icon: 'pi pi-cog' },
-  { separator: true },
-  { label: 'Выйти', icon: 'pi pi-sign-out' },
-]
-const toggleUserMenu = (e: Event) => userMenu.value.toggle(e)
-
 const pageTitle = computed(() => {
-  for (const s of sections) for (const i of s.items) if (isActive(i.to)) return i.label
+  for (const s of sections.value) for (const i of s.items) if (isActive(i.to)) return i.label
   return 'ЕХД'
 })
+
+const userMenu = ref()
+const userLabel = computed(() => session.user?.login ?? 'Гость')
+const userInitial = computed(() => (session.user?.login?.[0] ?? 'Г').toUpperCase())
+
+const userItems = computed(() => {
+  if (!session.isAuthenticated) {
+    return [{ label: 'Войти', icon: 'pi pi-sign-in', command: () => navigateTo('/login') }]
+  }
+  return [
+    { label: 'Сменить пароль', icon: 'pi pi-key', command: () => navigateTo('/change-password') },
+    { separator: true },
+    {
+      label: 'Выйти',
+      icon: 'pi pi-sign-out',
+      command: async () => {
+        await auth.logout()
+        await navigateTo('/login')
+      },
+    },
+  ]
+})
+const toggleUserMenu = (e: Event) => userMenu.value.toggle(e)
 </script>
 
 <template>
@@ -58,11 +80,6 @@ const pageTitle = computed(() => {
           </NuxtLink>
         </div>
       </nav>
-
-      <NuxtLink to="/login" class="nav-item nav-foot" v-tooltip.right="collapsed ? 'Вход' : undefined">
-        <i class="pi pi-sign-in" />
-        <span v-if="!collapsed">Вход в систему</span>
-      </NuxtLink>
     </aside>
 
     <div class="main">
@@ -78,13 +95,9 @@ const pageTitle = computed(() => {
         <h1 class="topbar-title">{{ pageTitle }}</h1>
 
         <div class="topbar-right">
-          <OverlayBadge value="2" severity="danger">
-            <Button text rounded severity="secondary" icon="pi pi-bell" aria-label="Уведомления" />
-          </OverlayBadge>
-
           <button class="user-chip" aria-label="Меню пользователя" @click="toggleUserMenu">
-            <Avatar label="А" shape="circle" class="user-avatar" />
-            <span class="user-name">Администратор</span>
+            <Avatar :label="userInitial" shape="circle" class="user-avatar" />
+            <span class="user-name">{{ userLabel }}</span>
             <i class="pi pi-angle-down user-caret" />
           </button>
           <Menu ref="userMenu" :model="userItems" :popup="true" />
@@ -107,8 +120,6 @@ const pageTitle = computed(() => {
 .shell.collapsed {
   --sidebar-w: 76px;
 }
-
-/* Sidebar */
 .sidebar {
   width: var(--sidebar-w);
   flex-shrink: 0;
@@ -187,14 +198,6 @@ const pageTitle = computed(() => {
   justify-content: center;
   gap: 0;
 }
-.nav-foot {
-  margin: 0.6rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 0;
-  padding-top: 0.9rem;
-}
-
-/* Main */
 .main {
   flex: 1;
   min-width: 0;
