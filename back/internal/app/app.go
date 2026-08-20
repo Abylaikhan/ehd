@@ -70,13 +70,32 @@ func Run(cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
+
+	// Выбор верификатора ЭЦП: stub (sandbox) | ncalayer (ddulesov, RSA) | ncanode (Kalkan-сайдкар, RSA+ГОСТ РК).
+	var edsVerifier eds.Verifier
+	switch cfg.EDS.Mode {
+	case config.EDSModeNCANode:
+		edsVerifier = eds.NewNCANodeVerifier(cfg.EDS.NCANodeURL, log)
+		log.Info("eds mode: ncanode", zap.String("url", cfg.EDS.NCANodeURL))
+	case config.EDSModeNCALayer:
+		v, err := eds.NewNCALayerVerifier(cfg.EDS.TrustDir, cfg.EDS.OCSPEnabled, log)
+		if err != nil {
+			return err
+		}
+		edsVerifier = v
+		log.Info("eds mode: ncalayer", zap.String("trust_dir", cfg.EDS.TrustDir), zap.Bool("ocsp", cfg.EDS.OCSPEnabled))
+	default:
+		edsVerifier = eds.StubVerifier{}
+		log.Info("eds mode: stub (sandbox)")
+	}
+
 	authService := authapp.NewService(
 		authrepo.NewUserRepo(db),
 		authrepo.NewRoleRepo(db),
 		authrepo.NewSessionRepo(db),
 		authrepo.NewReferenceRepo(db),
 		cipher,
-		eds.StubVerifier{},
+		edsVerifier,
 		authapp.Settings{
 			SessionTTL:        cfg.Auth.SessionTTL,
 			TempPasswordTTL:   cfg.Auth.TempPasswordTTL,

@@ -10,6 +10,7 @@ type Identity struct {
 	UserID          string
 	Login           string
 	IsAdmin         bool
+	HasPassword     bool // задан ли пароль (у входа по ЭЦП пароля может не быть)
 	RoleCodes       []string
 	RegionCodes     []string
 	DepartmentCodes []string

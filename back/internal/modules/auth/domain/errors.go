@@ -16,4 +16,5 @@ var (
 	ErrNotFound            = errors.New("not found")
 	ErrLastAdmin           = errors.New("cannot block or demote the last active administrator")
 	ErrChallengeInvalid    = errors.New("eds challenge invalid or expired")
+	ErrEDSVerification     = errors.New("eds signature verification failed")
 )
