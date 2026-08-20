@@ -1,10 +1,17 @@
-// Pinia — только для кросс-страничного состояния (требование ТЗ): сессия здесь.
+import type { Me } from '~~/shared/api/types'
+
+// Pinia — только кросс-страничное состояние (ТЗ): текущая сессия/личность.
 export const useSessionStore = defineStore('session', {
   state: () => ({
-    user: null as null | { id: string; login: string; roles: string[] },
+    user: null as Me | null,
   }),
   getters: {
-    isAuthenticated: (state) => state.user !== null,
-    isAdmin: (state) => state.user?.roles.includes('admin') ?? false,
+    isAuthenticated: (s): boolean => s.user !== null,
+    isAdmin: (s): boolean => s.user?.is_admin ?? false,
+  },
+  actions: {
+    set(user: Me | null) {
+      this.user = user
+    },
   },
 })
