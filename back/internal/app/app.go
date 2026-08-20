@@ -13,11 +13,14 @@ import (
 	"go.uber.org/zap"
 
 	"ehd-api/config"
+	authapp "ehd-api/internal/modules/auth/application"
+	"ehd-api/internal/modules/auth/eds"
 	authrepo "ehd-api/internal/modules/auth/repository"
 	authhttp "ehd-api/internal/modules/auth/transport/http"
 	reporterrepo "ehd-api/internal/modules/reporter/repository"
 	reporterhttp "ehd-api/internal/modules/reporter/transport/http"
 	"ehd-api/pkg/clickhouse"
+	"ehd-api/pkg/crypto"
 	"ehd-api/pkg/httpserver"
 	"ehd-api/pkg/logger"
 	"ehd-api/pkg/postgres"
@@ -52,12 +55,35 @@ func Run(cfg *config.Config) error {
 	}
 	log.Info("automigrate complete")
 
+	if err := authrepo.SeedReference(db); err != nil {
+		return err
+	}
 	if cfg.Admin.Password != "" {
 		if err := authrepo.SeedAdmin(db, cfg.Admin.Login, cfg.Admin.Email, cfg.Admin.Password); err != nil {
 			return err
 		}
 		log.Info("admin seeded", zap.String("login", cfg.Admin.Login))
 	}
+
+	// --- Auth Module (crypto + repos + service) ---
+	cipher, err := crypto.New(cfg.Auth.EncKey, cfg.Auth.HMACKey)
+	if err != nil {
+		return err
+	}
+	authService := authapp.NewService(
+		authrepo.NewUserRepo(db),
+		authrepo.NewRoleRepo(db),
+		authrepo.NewSessionRepo(db),
+		authrepo.NewReferenceRepo(db),
+		cipher,
+		eds.StubVerifier{},
+		authapp.Settings{
+			SessionTTL:        cfg.Auth.SessionTTL,
+			TempPasswordTTL:   cfg.Auth.TempPasswordTTL,
+			MaxFailedAttempts: cfg.Auth.MaxFailedAttempts,
+		},
+	)
+	authHandler := authhttp.NewHandler(authService, cfg.Auth.CookieSecure)
 
 	// --- ClickHouse (read-only источник Reporter) ---
 	ch, err := clickhouse.New(cfg.CH)
@@ -91,7 +117,7 @@ func Run(cfg *config.Config) error {
 	})
 
 	api := app.Group("/api/v1")
-	authhttp.Register(api.Group("/auth"))
+	authhttp.Register(api.Group("/auth"), authHandler)
 	reporterhttp.Register(api.Group("/reporter"))
 
 	// --- запуск + graceful shutdown ---

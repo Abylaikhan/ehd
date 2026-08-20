@@ -57,6 +57,13 @@ services:
       ADMIN_LOGIN: ${ADMIN_LOGIN:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin12345}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.kz}
+      # Auth Module: ключи PII/HMAC (local dev-значения; в non-local обязательны и вне репозитория)
+      AUTH_ENC_KEY: ${AUTH_ENC_KEY:-000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f}
+      AUTH_HMAC_KEY: ${AUTH_HMAC_KEY:-ehd-local-hmac-key}
+      SESSION_TTL: ${SESSION_TTL:-3h}
+      TEMP_PASSWORD_TTL: ${TEMP_PASSWORD_TTL:-72h}
+      MAX_FAILED_ATTEMPTS: ${MAX_FAILED_ATTEMPTS:-3}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
     volumes:
       - ./back:/app
       - gomod:/go/pkg/mod
