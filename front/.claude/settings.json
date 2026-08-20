@@ -1,0 +1,40 @@
+{
+  "enableAllProjectMcpServers": true,
+  "permissions": {
+    "allow": [
+      "mcp__graphify",
+      "mcp__git",
+      "mcp__docker",
+      "Read",
+      "Edit",
+      "Write",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm dev:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(npx nuxt:*)",
+      "Bash(docker compose -f docker-compose.dev.yml ps:*)",
+      "Bash(docker compose -f docker-compose.dev.yml logs:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(git push:*)",
+      "Bash(docker compose -f docker-compose.dev.yml down:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/redirect-to-graphify.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

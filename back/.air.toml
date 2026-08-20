@@ -1,0 +1,12 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/main ./cmd/ehd-api"
+bin = "tmp/main"
+include_ext = ["go"]
+exclude_dir = ["tmp", "openapi"]
+delay = 500
+
+[log]
+main_only = true

@@ -1,0 +1,19 @@
+.env
+.DS_Store
+.idea/
+.tz_extracted.txt
+.tz_extracted.md
+TZ_Reporter_ClickHouse.docx
+
+# Go
+back/tmp/
+
+# Nuxt
+front/node_modules/
+front/.nuxt/
+front/.output/
+front/.data/
+
+# Agent harness
+graphify-out/
+.claude/settings.local.json
