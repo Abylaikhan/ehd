@@ -10,12 +10,15 @@ import (
 	"ehd-api/pkg/httpserver"
 )
 
-// Handler — HTTP-хендлеры Reporter Module (управление источником и интроспекция).
+// Handler — HTTP-хендлеры Reporter Module (источник, интроспекция, представления).
 type Handler struct {
-	svc *application.Service
+	svc   *application.Service
+	views *application.ViewService
 }
 
-func NewHandler(svc *application.Service) *Handler { return &Handler{svc: svc} }
+func NewHandler(svc *application.Service, views *application.ViewService) *Handler {
+	return &Handler{svc: svc, views: views}
+}
 
 func badRequest(field, reason string) *httpserver.APIError {
 	return httpserver.NewError(fiber.StatusUnprocessableEntity, "VALIDATION_ERROR", "Некорректные данные",
@@ -167,6 +170,18 @@ func mapErr(err error) error {
 		return httpserver.NewError(fiber.StatusBadGateway, "SOURCE_CONNECTION_FAILED", "Не удалось подключиться к источнику")
 	case errors.Is(err, domain.ErrValidation):
 		return httpserver.NewError(fiber.StatusUnprocessableEntity, "VALIDATION_ERROR", "Некорректные данные источника")
+	case errors.Is(err, domain.ErrViewNotFound):
+		return httpserver.NewError(fiber.StatusNotFound, "VIEW_NOT_FOUND", "Представление не найдено")
+	case errors.Is(err, domain.ErrSlugTaken):
+		return httpserver.NewError(fiber.StatusConflict, "SLUG_TAKEN", "Slug уже используется")
+	case errors.Is(err, domain.ErrSourceInactive):
+		return httpserver.NewError(fiber.StatusConflict, "SOURCE_INACTIVE", "Источник не активен")
+	case errors.Is(err, domain.ErrTableNotFound):
+		return httpserver.NewError(fiber.StatusUnprocessableEntity, "SOURCE_TABLE_NOT_FOUND", "Таблица не найдена в источнике")
+	case errors.Is(err, domain.ErrPublishValidation):
+		return httpserver.NewError(fiber.StatusUnprocessableEntity, "PUBLISH_VALIDATION", "Представление не готово к публикации: нужны активный источник, ≥1 видимая колонка, валидный slug и ≥1 роль")
+	case errors.Is(err, domain.ErrViewValidation):
+		return httpserver.NewError(fiber.StatusUnprocessableEntity, "VALIDATION_ERROR", "Некорректные данные представления")
 	default:
 		return httpserver.NewError(fiber.StatusInternalServerError, "INTERNAL_ERROR", "Внутренняя ошибка сервера")
 	}

@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"regexp"
+	"time"
+)
 
 // Статусы представления по ТЗ (раздел 5, статусная модель Data View).
 const (
@@ -17,7 +20,27 @@ const (
 	SourceModeManagedQuery   = "managed_query" // Phase 2, за feature flag
 )
 
-// DataView — конфигурация опубликованного представления таблицы ClickHouse.
+// Режимы ограничения строк (ТЗ, Row scope).
+const (
+	RowScopeByProfile    = "by_profile"
+	RowScopeUnrestricted = "unrestricted"
+)
+
+// Направление сортировки.
+const (
+	SortAsc  = "asc"
+	SortDesc = "desc"
+)
+
+// Границы пагинации и экспорта из ТЗ (раздел «Создание Data View»).
+const (
+	DefaultPageSize = 50
+	MinPageSize     = 20
+	MaxPageSize     = 200
+	MaxExportRows   = 100000
+)
+
+// DataView — конфигурация представления таблицы ClickHouse.
 type DataView struct {
 	ID           string
 	Name         string
@@ -30,7 +53,27 @@ type DataView struct {
 	Status       string
 	Revision     int64
 	SchemaHash   string
-	PublishedAt  *time.Time
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+
+	// Параметры поведения (ТЗ «Создание Data View»).
+	PageSizeDefault   int
+	PageSizeMin       int
+	PageSizeMax       int
+	DefaultSortColumn string
+	DefaultSortDir    string
+	ExportRowLimit    int
+	RowScopeMode      string
+
+	PublishedAt *time.Time
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+var slugRe = regexp.MustCompile(`^[a-z0-9-]+$`)
+
+// ValidSlug проверяет slug: lowercase, латиница/цифры/дефис (ТЗ, Slug).
+func ValidSlug(s string) bool { return s != "" && slugRe.MatchString(s) }
+
+// ValidRowScope проверяет режим ограничения строк.
+func ValidRowScope(m string) bool {
+	return m == RowScopeByProfile || m == RowScopeUnrestricted
 }
