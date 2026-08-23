@@ -27,4 +27,17 @@ func Register(r fiber.Router, h *Handler, guard *Guard) {
 	sources.Get("/:id/databases", h.databases)
 	sources.Get("/:id/databases/:db/tables", h.tables)
 	sources.Get("/:id/databases/:db/tables/:table/columns", h.columns)
+
+	// представления (Data View)
+	views := admin.Group("/views")
+	views.Post("", h.createView)
+	views.Get("", h.listViews)
+	views.Get("/:id", h.getView)
+	views.Patch("/:id", h.updateView)
+	views.Delete("/:id", h.deleteView)
+	views.Put("/:id/columns", h.updateViewColumns)
+	views.Post("/:id/columns/refresh", h.refreshViewColumns)
+	views.Put("/:id/permissions", h.setViewPermissions)
+	views.Post("/:id/publish", h.publishView)
+	views.Post("/:id/disable", h.disableView)
 }

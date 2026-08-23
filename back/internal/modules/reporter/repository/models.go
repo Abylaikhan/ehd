@@ -44,10 +44,73 @@ type DataSourceModel struct {
 
 func (DataSourceModel) TableName() string { return "data_sources" }
 
+// DataViewModel — конфигурация представления таблицы (REP-FR-040..044).
+// PublishedSnapshot — неизменяемая опубликованная конфигурация (jsonb) для Query Engine.
+type DataViewModel struct {
+	ID                uuid.UUID `gorm:"type:uuid;primaryKey"`
+	Name              string    `gorm:"size:255;not null"`
+	Slug              string    `gorm:"size:128;not null;uniqueIndex"`
+	Description       string    `gorm:"size:1024"`
+	DataSourceID      uuid.UUID `gorm:"type:uuid;not null;index"`
+	DatabaseName      string    `gorm:"size:255;not null"`
+	SourceTable       string    `gorm:"column:table_name;size:255;not null"`
+	SourceMode        string    `gorm:"size:32;not null;default:physical_object"`
+	Status            string    `gorm:"size:16;not null;default:draft;index"`
+	Revision          int64     `gorm:"not null;default:0"`
+	SchemaHash        string    `gorm:"size:64"`
+	PageSizeDefault   int       `gorm:"not null;default:50"`
+	PageSizeMin       int       `gorm:"not null;default:20"`
+	PageSizeMax       int       `gorm:"not null;default:200"`
+	DefaultSortColumn string    `gorm:"size:255"`
+	DefaultSortDir    string    `gorm:"size:4"`
+	ExportRowLimit    int       `gorm:"not null;default:100000"`
+	RowScopeMode      string    `gorm:"size:16;not null;default:by_profile"`
+	PublishedSnapshot *string   `gorm:"type:jsonb"` // NULL пока не опубликовано (пустая строка — невалидный jsonb)
+	PublishedAt       *time.Time
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
+func (DataViewModel) TableName() string { return "data_views" }
+
+// ViewColumnModel — настройка колонки представления (ТЗ, «Настройка колонок»).
+type ViewColumnModel struct {
+	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
+	ViewID      uuid.UUID `gorm:"type:uuid;not null;index:idx_view_columns_view"`
+	SourceName  string    `gorm:"size:255;not null"`
+	SourceType  string    `gorm:"size:255;not null"`
+	Label       string    `gorm:"size:255"`
+	DisplayType string    `gorm:"size:16"`
+	Position    int       `gorm:"not null;default:0"`
+	Visible     bool      `gorm:"not null;default:false"`
+	Searchable  bool      `gorm:"not null;default:false"`
+	Filterable  bool      `gorm:"not null;default:false"`
+	Sortable    bool      `gorm:"not null;default:false"`
+	Exportable  bool      `gorm:"not null;default:false"`
+	Format      string    `gorm:"type:jsonb;not null;default:'{}'"`
+	MaskRule    string    `gorm:"size:16;not null;default:none"`
+	Width       int       `gorm:"not null;default:0"`
+	NullLabel   string    `gorm:"size:255"`
+}
+
+func (ViewColumnModel) TableName() string { return "view_columns" }
+
+// ViewPermissionModel — доступ роли к представлению (ТЗ, Права).
+type ViewPermissionModel struct {
+	ID       uuid.UUID `gorm:"type:uuid;primaryKey"`
+	ViewID   uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_view_perm,priority:1"`
+	RoleCode string    `gorm:"size:64;not null;uniqueIndex:idx_view_perm,priority:2"`
+}
+
+func (ViewPermissionModel) TableName() string { return "view_permissions" }
+
 // Migrate создаёт/обновляет таблицы Reporter через GORM AutoMigrate.
 func Migrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&AuditLogModel{},
 		&DataSourceModel{},
+		&DataViewModel{},
+		&ViewColumnModel{},
+		&ViewPermissionModel{},
 	)
 }
