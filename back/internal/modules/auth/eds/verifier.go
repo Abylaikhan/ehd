@@ -2,12 +2,7 @@
 // реальная проверка сертификата/цепочки/отзыва подключается через тот же интерфейс (Phase 2).
 package eds
 
-import (
-	"errors"
-	"strings"
-)
-
-var ErrInvalidSignature = errors.New("invalid eds signature")
+import "strings"
 
 // SignatureData — извлечённые из подписи данные субъекта.
 type SignatureData struct {

@@ -15,6 +15,7 @@ type Config struct {
 	CH    CH
 	Admin Admin
 	Auth  Auth
+	EDS   EDS
 }
 
 type App struct {
@@ -62,6 +63,21 @@ type Auth struct {
 // devEncKey — фиксированный dev-ключ (только для local); в non-local обязателен AUTH_ENC_KEY.
 const devEncKey = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
 
+// EDS — параметры проверки ЭЦП (NCALayer).
+// Mode: "stub" (sandbox, без NCALayer) или "ncalayer" (реальная проверка CMS).
+type EDS struct {
+	Mode        string
+	TrustDir    string // каталог с корневыми/промежуточными сертификатами НУЦ РК (PEM/DER)
+	OCSPEnabled bool
+	NCANodeURL  string // URL сайдкара NCANode (для режима ncanode)
+}
+
+const (
+	EDSModeStub     = "stub"
+	EDSModeNCALayer = "ncalayer" // ddulesov/pkcs7: RSA (ГОСТ РК не поддерживается)
+	EDSModeNCANode  = "ncanode"  // сайдкар NCANode (Kalkan): RSA + ГОСТ РК
+)
+
 // New читает конфигурацию из переменных окружения через viper.
 func New() (*Config, error) {
 	v := viper.New()
@@ -77,6 +93,10 @@ func New() (*Config, error) {
 	v.SetDefault("TEMP_PASSWORD_TTL", "72h")
 	v.SetDefault("MAX_FAILED_ATTEMPTS", 3)
 	v.SetDefault("COOKIE_SECURE", false)
+	v.SetDefault("EDS_MODE", EDSModeStub)
+	v.SetDefault("EDS_TRUST_DIR", "/app/eds-trust")
+	v.SetDefault("EDS_OCSP_ENABLED", true)
+	v.SetDefault("NCANODE_URL", "http://ncanode:14579")
 
 	cfg := &Config{
 		App:  App{Name: v.GetString("APP_NAME"), Env: v.GetString("APP_ENV")},
@@ -101,6 +121,12 @@ func New() (*Config, error) {
 			TempPasswordTTL:   v.GetDuration("TEMP_PASSWORD_TTL"),
 			MaxFailedAttempts: v.GetInt("MAX_FAILED_ATTEMPTS"),
 			CookieSecure:      v.GetBool("COOKIE_SECURE"),
+		},
+		EDS: EDS{
+			Mode:        v.GetString("EDS_MODE"),
+			TrustDir:    v.GetString("EDS_TRUST_DIR"),
+			OCSPEnabled: v.GetBool("EDS_OCSP_ENABLED"),
+			NCANodeURL:  v.GetString("NCANODE_URL"),
 		},
 	}
 

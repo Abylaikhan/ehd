@@ -57,6 +57,7 @@ type meResp struct {
 	UserID          string   `json:"user_id"`
 	Login           string   `json:"login"`
 	IsAdmin         bool     `json:"is_admin"`
+	HasPassword     bool     `json:"has_password"`
 	Roles           []string `json:"roles"`
 	RegionCodes     []string `json:"region_codes"`
 	DepartmentCodes []string `json:"department_codes"`
