@@ -17,6 +17,8 @@ import (
 	"ehd-api/internal/modules/auth/eds"
 	authrepo "ehd-api/internal/modules/auth/repository"
 	authhttp "ehd-api/internal/modules/auth/transport/http"
+	reporterapp "ehd-api/internal/modules/reporter/application"
+	reporterch "ehd-api/internal/modules/reporter/chsource"
 	reporterrepo "ehd-api/internal/modules/reporter/repository"
 	reporterhttp "ehd-api/internal/modules/reporter/transport/http"
 	"ehd-api/pkg/clickhouse"
@@ -101,7 +103,18 @@ func Run(cfg *config.Config) error {
 	)
 	authHandler := authhttp.NewHandler(authService, cfg.Auth.CookieSecure)
 
-	// --- ClickHouse (read-only источник Reporter) ---
+	// --- Reporter Module (источник ClickHouse + интроспекция) ---
+	reporterService := reporterapp.NewService(
+		reporterrepo.NewDataSourceRepo(db),
+		cipher,
+		reporterch.New(),
+		reporterapp.Config{SystemDBDenylist: cfg.Reporter.SystemDBDenylist},
+		log,
+	)
+	reporterHandler := reporterhttp.NewHandler(reporterService)
+	reporterGuard := reporterhttp.NewGuard(authService) // RBAC через auth/contract (без сети)
+
+	// --- ClickHouse (read-only проверка готовности источника по умолчанию) ---
 	ch, err := clickhouse.New(cfg.CH)
 	if err != nil {
 		return err
@@ -134,7 +147,7 @@ func Run(cfg *config.Config) error {
 
 	api := app.Group("/api/v1")
 	authhttp.Register(api.Group("/auth"), authHandler)
-	reporterhttp.Register(api.Group("/reporter"))
+	reporterhttp.Register(api.Group("/reporter"), reporterHandler, reporterGuard)
 
 	// --- запуск + graceful shutdown ---
 	errCh := make(chan error, 1)
