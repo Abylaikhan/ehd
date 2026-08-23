@@ -48,4 +48,5 @@ func Register(r fiber.Router, h *Handler, guard *Guard) {
 	user.Get("/views/:slug", h.userViewMeta)
 	user.Post("/views/:slug/query", h.userQuery)
 	user.Post("/views/:slug/count", h.userCount)
+	user.Post("/views/:slug/export", h.exportView)
 }

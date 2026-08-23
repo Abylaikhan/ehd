@@ -38,4 +38,11 @@ var (
 	ErrQueryValidation = errors.New("некорректный запрос данных")
 	// ErrViewNotConfigured — у представления не задан стабильный ключ для keyset-пагинации.
 	ErrViewNotConfigured = errors.New("представление не сконфигурировано для запросов")
+
+	// --- Export ---
+
+	// ErrExportBusy — в системе уже выполняется экспорт (одновременно допустим один).
+	ErrExportBusy = errors.New("экспорт уже выполняется")
+	// ErrExportTooLarge — набор превышает жёсткий лимит выгрузки (100 000 строк).
+	ErrExportTooLarge = errors.New("слишком большой набор для экспорта")
 )

@@ -191,6 +191,10 @@ func mapErr(err error) error {
 		return httpserver.NewError(fiber.StatusUnprocessableEntity, "QUERY_VALIDATION", "Некорректный запрос данных")
 	case errors.Is(err, domain.ErrViewNotConfigured):
 		return httpserver.NewError(fiber.StatusUnprocessableEntity, "VIEW_NOT_CONFIGURED", "Представление не сконфигурировано для запросов")
+	case errors.Is(err, domain.ErrExportBusy):
+		return httpserver.NewError(fiber.StatusTooManyRequests, "EXPORT_BUSY", "Экспорт уже выполняется, повторите позже")
+	case errors.Is(err, domain.ErrExportTooLarge):
+		return httpserver.NewError(fiber.StatusRequestEntityTooLarge, "EXPORT_TOO_LARGE", "Слишком большой набор для экспорта; уточните фильтры")
 	default:
 		return httpserver.NewError(fiber.StatusInternalServerError, "INTERNAL_ERROR", "Внутренняя ошибка сервера")
 	}

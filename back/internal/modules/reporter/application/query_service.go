@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -24,13 +26,14 @@ type Requester struct {
 
 // QueryService — безопасное выполнение запросов к данным по опубликованному представлению.
 type QueryService struct {
-	views   ViewRepo
-	sources *Service
-	log     *zap.Logger
+	views     ViewRepo
+	sources   *Service
+	log       *zap.Logger
+	exportSem chan struct{} // cap 1: одновременно один экспорт в системе (REP-FR export)
 }
 
 func NewQueryService(views ViewRepo, sources *Service, log *zap.Logger) *QueryService {
-	return &QueryService{views: views, sources: sources, log: log}
+	return &QueryService{views: views, sources: sources, log: log, exportSem: make(chan struct{}, 1)}
 }
 
 // ViewColumnMeta — колонка представления для рендера (с разрешёнными операциями).
@@ -263,55 +266,12 @@ func buildPlan(snap domain.PublishedSnapshot, spec domain.QuerySpec, req Request
 		selectCols = append(selectCols, snap.KeysetColumn)
 	}
 
-	// фильтры: только whitelist + filterable + допустимый оператор
-	filters := make([]querybuilder.Filter, 0, len(spec.Filters))
-	for _, f := range spec.Filters {
-		col, ok := byName[f.Column]
-		if !ok || !col.Filterable {
-			return querybuilder.Plan{}, planMeta{}, domain.ErrQueryValidation
-		}
-		if !domain.OperatorAllowed(col.DisplayType, f.Operator) {
-			return querybuilder.Plan{}, planMeta{}, domain.ErrQueryValidation
-		}
-		if domain.OperatorNeedsValue(f.Operator) && f.Value == nil {
-			return querybuilder.Plan{}, planMeta{}, domain.ErrQueryValidation
-		}
-		if f.Operator == domain.OpIn && len(f.Values) == 0 {
-			return querybuilder.Plan{}, planMeta{}, domain.ErrQueryValidation
-		}
-		if f.Operator == domain.OpBetween && len(f.Values) != 2 {
-			return querybuilder.Plan{}, planMeta{}, domain.ErrQueryValidation
-		}
-		filters = append(filters, querybuilder.Filter{
-			Column: col.SourceName, DisplayType: col.DisplayType, Operator: f.Operator,
-			Value: f.Value, Values: f.Values,
-		})
+	filters, err := validateFilters(byName, spec)
+	if err != nil {
+		return querybuilder.Plan{}, planMeta{}, err
 	}
-
-	// поиск: только searchable строковые колонки
-	var search *querybuilder.Search
-	if strings.TrimSpace(spec.Search) != "" {
-		var scols []string
-		for _, c := range snap.Columns {
-			if c.Searchable && (c.DisplayType == domain.DisplayText || c.DisplayType == domain.DisplayEnum) {
-				scols = append(scols, c.SourceName)
-			}
-		}
-		if len(scols) > 0 {
-			search = &querybuilder.Search{Columns: scols, Term: spec.Search}
-		}
-	}
-
-	// RLS: только by_profile и не админ и не preview (REP-FR-11..14)
-	var rs querybuilder.RowScope
-	if !preview && !req.IsAdmin && snap.RowScopeMode == domain.RowScopeByProfile {
-		rs = querybuilder.RowScope{
-			RegionColumn:     snap.RowScopeRegionColumn,
-			Regions:          req.RegionCodes,
-			DepartmentColumn: snap.RowScopeDepartmentColumn,
-			Departments:      req.DepartmentCodes,
-		}
-	}
+	search := buildSearch(snap, spec)
+	rs := buildRowScope(snap, req, preview)
 
 	// keyset
 	dir := snap.KeysetDir
@@ -366,6 +326,184 @@ func buildResult(snap domain.PublishedSnapshot, rows []map[string]any, pm planMe
 		cols[i] = domain.ResultColumn{SourceName: c.SourceName, Label: c.Label, DisplayType: c.DisplayType}
 	}
 	return domain.QueryResult{Columns: cols, Rows: outRows, NextCursor: next, PageSize: pm.pageSize}
+}
+
+// ExportResult — подготовленные данные для генерации XLSX.
+type ExportResult struct {
+	Filename string
+	Headers  []string
+	Rows     [][]any
+}
+
+// Export готовит весь отфильтрованный набор (только exportable-колонки) для XLSX (REP-BR-008/009).
+func (s *QueryService) Export(ctx context.Context, req Requester, slug string, spec domain.QuerySpec) (ExportResult, error) {
+	// одновременно допустим только один экспорт в системе
+	select {
+	case s.exportSem <- struct{}{}:
+		defer func() { <-s.exportSem }()
+	default:
+		return ExportResult{}, domain.ErrExportBusy
+	}
+
+	view, snap, err := s.resolve(ctx, req, slug)
+	if err != nil {
+		return ExportResult{}, err
+	}
+	if snap.KeysetColumn == "" {
+		return ExportResult{}, domain.ErrViewNotConfigured
+	}
+
+	byName := make(map[string]domain.SnapshotColumn, len(snap.Columns))
+	var expCols []domain.SnapshotColumn
+	for _, c := range snap.Columns {
+		byName[c.SourceName] = c
+		if c.Exportable {
+			expCols = append(expCols, c)
+		}
+	}
+	if len(expCols) == 0 {
+		return ExportResult{}, domain.ErrQueryValidation
+	}
+
+	filters, err := validateFilters(byName, spec)
+	if err != nil {
+		return ExportResult{}, err
+	}
+	search := buildSearch(snap, spec)
+	rs := buildRowScope(snap, req, false)
+
+	limit := snap.ExportRowLimit
+	if limit <= 0 || limit > domain.MaxExportRows {
+		limit = domain.MaxExportRows
+	}
+	dir := snap.KeysetDir
+	if dir == "" {
+		dir = domain.SortAsc
+	}
+
+	selectCols := make([]string, len(expCols))
+	for i, c := range expCols {
+		selectCols[i] = c.SourceName
+	}
+	plan := querybuilder.Plan{
+		Database:   snap.DatabaseName,
+		Table:      snap.TableName,
+		SelectCols: selectCols,
+		Filters:    filters,
+		Search:     search,
+		RowScope:   rs,
+		Keyset:     querybuilder.Keyset{Column: snap.KeysetColumn, Dir: dir}, // без cursor
+		Limit:      limit + 1,                                                // +1 — детект превышения без полного COUNT
+	}
+	sql, args, err := plan.Build()
+	if err != nil {
+		return ExportResult{}, domain.ErrQueryValidation
+	}
+	rows, err := s.sources.RunQuery(ctx, view.DataSourceID, snap.DatabaseName, sql, args)
+	if err != nil {
+		s.log.Warn("export query failed", zap.String("slug", slug), zap.Error(err))
+		return ExportResult{}, domain.ErrSourceUnavailable
+	}
+	if len(rows) > limit {
+		return ExportResult{}, domain.ErrExportTooLarge
+	}
+
+	headers := make([]string, len(expCols))
+	for i, c := range expCols {
+		headers[i] = c.Label
+		if headers[i] == "" {
+			headers[i] = c.SourceName
+		}
+	}
+	matrix := make([][]any, len(rows))
+	for i, r := range rows {
+		cells := make([]any, len(expCols))
+		for j, c := range expCols {
+			cells[j] = cellValue(r[c.SourceName])
+		}
+		matrix[i] = cells
+	}
+	return ExportResult{Filename: slug, Headers: headers, Rows: matrix}, nil
+}
+
+// --- построение плана (переиспользуется query/count/export) ---
+
+func validateFilters(byName map[string]domain.SnapshotColumn, spec domain.QuerySpec) ([]querybuilder.Filter, error) {
+	filters := make([]querybuilder.Filter, 0, len(spec.Filters))
+	for _, f := range spec.Filters {
+		col, ok := byName[f.Column]
+		if !ok || !col.Filterable {
+			return nil, domain.ErrQueryValidation
+		}
+		if !domain.OperatorAllowed(col.DisplayType, f.Operator) {
+			return nil, domain.ErrQueryValidation
+		}
+		if domain.OperatorNeedsValue(f.Operator) && f.Value == nil {
+			return nil, domain.ErrQueryValidation
+		}
+		if f.Operator == domain.OpIn && len(f.Values) == 0 {
+			return nil, domain.ErrQueryValidation
+		}
+		if f.Operator == domain.OpBetween && len(f.Values) != 2 {
+			return nil, domain.ErrQueryValidation
+		}
+		filters = append(filters, querybuilder.Filter{
+			Column: col.SourceName, DisplayType: col.DisplayType, Operator: f.Operator,
+			Value: f.Value, Values: f.Values,
+		})
+	}
+	return filters, nil
+}
+
+func buildSearch(snap domain.PublishedSnapshot, spec domain.QuerySpec) *querybuilder.Search {
+	if strings.TrimSpace(spec.Search) == "" {
+		return nil
+	}
+	var scols []string
+	for _, c := range snap.Columns {
+		if c.Searchable && (c.DisplayType == domain.DisplayText || c.DisplayType == domain.DisplayEnum) {
+			scols = append(scols, c.SourceName)
+		}
+	}
+	if len(scols) == 0 {
+		return nil
+	}
+	return &querybuilder.Search{Columns: scols, Term: spec.Search}
+}
+
+func buildRowScope(snap domain.PublishedSnapshot, req Requester, preview bool) querybuilder.RowScope {
+	if preview || req.IsAdmin || snap.RowScopeMode != domain.RowScopeByProfile {
+		return querybuilder.RowScope{}
+	}
+	return querybuilder.RowScope{
+		RegionColumn:     snap.RowScopeRegionColumn,
+		Regions:          req.RegionCodes,
+		DepartmentColumn: snap.RowScopeDepartmentColumn,
+		Departments:      req.DepartmentCodes,
+	}
+}
+
+// cellValue приводит значение ячейки к простому типу для XLSX (разыменование указателей, NULL→пусто).
+func cellValue(v any) any {
+	if v == nil {
+		return ""
+	}
+	if rv := reflect.ValueOf(v); rv.Kind() == reflect.Ptr {
+		if rv.IsNil() {
+			return ""
+		}
+		v = rv.Elem().Interface()
+	}
+	switch x := v.(type) {
+	case time.Time:
+		return x
+	case string:
+		return x
+	case fmt.Stringer: // decimal.Decimal и т.п.
+		return x.String()
+	default:
+		return v
+	}
 }
 
 // --- helpers ---
