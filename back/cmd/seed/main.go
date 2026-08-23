@@ -23,9 +23,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("postgres: %v", err)
 	}
-	if err := postgres.EnsureSchemas(db, "auth"); err != nil {
-		log.Fatalf("schema: %v", err)
-	}
 	if err := authrepo.Migrate(db); err != nil {
 		log.Fatalf("migrate: %v", err)
 	}

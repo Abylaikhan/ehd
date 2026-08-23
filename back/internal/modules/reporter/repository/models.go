@@ -22,7 +22,7 @@ type AuditLogModel struct {
 	CreatedAt  time.Time  `gorm:"index"`
 }
 
-func (AuditLogModel) TableName() string { return "reporter.audit_logs" }
+func (AuditLogModel) TableName() string { return "audit_logs" }
 
 // Migrate создаёт/обновляет таблицы схемы reporter через GORM AutoMigrate.
 func Migrate(db *gorm.DB) error {

@@ -30,14 +30,3 @@ func New(dsn string) (*gorm.DB, error) {
 
 	return db, nil
 }
-
-// EnsureSchemas создаёт схемы модулей перед AutoMigrate.
-// Имена берутся из внутренних констант, не из пользовательского ввода.
-func EnsureSchemas(db *gorm.DB, schemas ...string) error {
-	for _, s := range schemas {
-		if err := db.Exec("CREATE SCHEMA IF NOT EXISTS " + s).Error; err != nil {
-			return err
-		}
-	}
-	return nil
-}
