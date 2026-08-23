@@ -93,3 +93,62 @@ export interface CreateRoleRequest {
 export interface ItemsResponse<T> {
   items: T[]
 }
+
+// --- Reporter: пользовательский просмотр витрин (backend slices 005/006) ---
+
+export interface UserViewListItem {
+  slug: string
+  name: string
+  description: string
+}
+
+export interface ColumnMeta {
+  source_name: string
+  label: string
+  display_type: string
+  searchable: boolean
+  filterable: boolean
+  sortable: boolean
+  operators: string[]
+}
+
+export interface ViewMeta {
+  slug: string
+  name: string
+  description: string
+  page_size_default: number
+  page_size_min: number
+  page_size_max: number
+  columns: ColumnMeta[]
+}
+
+export interface FilterSpec {
+  column: string
+  operator: string
+  value?: unknown
+  values?: unknown[]
+}
+
+export interface QuerySpec {
+  filters?: FilterSpec[]
+  search?: string
+  sort?: { dir?: 'asc' | 'desc' }
+  page_size?: number
+  cursor?: string
+}
+
+export interface ResultColumn {
+  source_name: string
+  label: string
+  display_type: string
+}
+
+export interface QueryResult {
+  columns: ResultColumn[]
+  rows: Record<string, unknown>[]
+  page: { page_size: number; next_cursor: string }
+}
+
+export interface CountResult {
+  total_count: number
+}
