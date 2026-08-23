@@ -24,9 +24,30 @@ type AuditLogModel struct {
 
 func (AuditLogModel) TableName() string { return "audit_logs" }
 
-// Migrate создаёт/обновляет таблицы схемы reporter через GORM AutoMigrate.
+// DataSourceModel — единственный read-only источник ClickHouse (REP-FR-010..014).
+// PasswordEnc хранит пароль в зашифрованном виде (AES-256-GCM); ключ вне БД.
+type DataSourceModel struct {
+	ID            uuid.UUID `gorm:"type:uuid;primaryKey"`
+	Code          string    `gorm:"size:64;not null;uniqueIndex"`
+	Name          string    `gorm:"size:255;not null"`
+	Host          string    `gorm:"size:255;not null"`
+	Port          int       `gorm:"not null"`
+	Protocol      string    `gorm:"size:16;not null;default:native"`
+	TLSEnabled    bool      `gorm:"not null;default:false"`
+	TLSSkipVerify bool      `gorm:"not null;default:false"`
+	Username      string    `gorm:"size:128;not null"`
+	PasswordEnc   []byte    `gorm:"type:bytea;not null"`
+	Status        string    `gorm:"size:16;not null;default:inactive"`
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+func (DataSourceModel) TableName() string { return "data_sources" }
+
+// Migrate создаёт/обновляет таблицы Reporter через GORM AutoMigrate.
 func Migrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&AuditLogModel{},
+		&DataSourceModel{},
 	)
 }

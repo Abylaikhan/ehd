@@ -2,20 +2,34 @@ package config
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
 )
 
+// splitList разбивает список, заданный через запятую, в срез непустых значений.
+func splitList(s string) []string {
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 type Config struct {
-	App   App
-	HTTP  HTTP
-	Log   Log
-	PG    PG
-	CH    CH
-	Admin Admin
-	Auth  Auth
-	EDS   EDS
+	App      App
+	HTTP     HTTP
+	Log      Log
+	PG       PG
+	CH       CH
+	Admin    Admin
+	Auth     Auth
+	EDS      EDS
+	Reporter Reporter
 }
 
 type App struct {
@@ -78,6 +92,12 @@ const (
 	EDSModeNCANode  = "ncanode"  // сайдкар NCANode (Kalkan): RSA + ГОСТ РК
 )
 
+// Reporter — параметры Reporter Module.
+type Reporter struct {
+	// SystemDBDenylist — базы ClickHouse, скрываемые из интроспекции (REP-FR «Просмотр структуры», п.2).
+	SystemDBDenylist []string
+}
+
 // New читает конфигурацию из переменных окружения через viper.
 func New() (*Config, error) {
 	v := viper.New()
@@ -97,6 +117,7 @@ func New() (*Config, error) {
 	v.SetDefault("EDS_TRUST_DIR", "/app/eds-trust")
 	v.SetDefault("EDS_OCSP_ENABLED", true)
 	v.SetDefault("NCANODE_URL", "http://ncanode:14579")
+	v.SetDefault("REPORTER_SYSTEM_DB_DENYLIST", "system,INFORMATION_SCHEMA,information_schema")
 
 	cfg := &Config{
 		App:  App{Name: v.GetString("APP_NAME"), Env: v.GetString("APP_ENV")},
@@ -127,6 +148,9 @@ func New() (*Config, error) {
 			TrustDir:    v.GetString("EDS_TRUST_DIR"),
 			OCSPEnabled: v.GetBool("EDS_OCSP_ENABLED"),
 			NCANodeURL:  v.GetString("NCANODE_URL"),
+		},
+		Reporter: Reporter{
+			SystemDBDenylist: splitList(v.GetString("REPORTER_SYSTEM_DB_DENYLIST")),
 		},
 	}
 
