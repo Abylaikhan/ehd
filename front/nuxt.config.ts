@@ -7,6 +7,11 @@ export default defineNuxtConfig({
 
   modules: ['@primevue/nuxt-module', '@pinia/nuxt'],
 
+  // Pinia-сторы живут в доменных слоях — включаем их в авто-импорт.
+  pinia: {
+    storesDirs: ['./stores/**', './layers/**/stores/**'],
+  },
+
   css: ['primeicons/primeicons.css', '~/assets/css/main.css'],
 
   primevue: {
@@ -19,7 +24,10 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     apiBase: 'http://localhost:8080',
-    public: {},
+    // edsMode: 'stub' | 'ncalayer' (переопределяется NUXT_PUBLIC_EDS_MODE)
+    public: {
+      edsMode: 'stub',
+    },
   },
 
   nitro: {
