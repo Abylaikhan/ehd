@@ -27,7 +27,7 @@ type UserModel struct {
 	UpdatedAt              time.Time
 }
 
-func (UserModel) TableName() string { return "auth.users" }
+func (UserModel) TableName() string { return "users" }
 
 type RoleModel struct {
 	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
@@ -39,14 +39,14 @@ type RoleModel struct {
 	UpdatedAt time.Time
 }
 
-func (RoleModel) TableName() string { return "auth.roles" }
+func (RoleModel) TableName() string { return "roles" }
 
 type UserRoleModel struct {
 	UserID uuid.UUID `gorm:"type:uuid;primaryKey"`
 	RoleID uuid.UUID `gorm:"type:uuid;primaryKey"`
 }
 
-func (UserRoleModel) TableName() string { return "auth.user_roles" }
+func (UserRoleModel) TableName() string { return "user_roles" }
 
 type SessionModel struct {
 	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
@@ -58,7 +58,7 @@ type SessionModel struct {
 	RevokedAt *time.Time
 }
 
-func (SessionModel) TableName() string { return "auth.sessions" }
+func (SessionModel) TableName() string { return "sessions" }
 
 type RegionModel struct {
 	ID     uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
@@ -68,7 +68,7 @@ type RegionModel struct {
 	Status string    `gorm:"size:16;not null;default:active"`
 }
 
-func (RegionModel) TableName() string { return "auth.regions" }
+func (RegionModel) TableName() string { return "regions" }
 
 type DepartmentModel struct {
 	ID     uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
@@ -78,18 +78,18 @@ type DepartmentModel struct {
 	Status string    `gorm:"size:16;not null;default:active"`
 }
 
-func (DepartmentModel) TableName() string { return "auth.departments" }
+func (DepartmentModel) TableName() string { return "departments" }
 
 type UserRegionModel struct {
 	UserID   uuid.UUID `gorm:"type:uuid;primaryKey"`
 	RegionID uuid.UUID `gorm:"type:uuid;primaryKey"`
 }
 
-func (UserRegionModel) TableName() string { return "auth.user_regions" }
+func (UserRegionModel) TableName() string { return "user_regions" }
 
 type UserDepartmentModel struct {
 	UserID       uuid.UUID `gorm:"type:uuid;primaryKey"`
 	DepartmentID uuid.UUID `gorm:"type:uuid;primaryKey"`
 }
 
-func (UserDepartmentModel) TableName() string { return "auth.user_departments" }
+func (UserDepartmentModel) TableName() string { return "user_departments" }

@@ -151,9 +151,9 @@ func (r *UserRepo) List(ctx context.Context, status, q string, limit, offset int
 
 func (r *UserRepo) CountActiveAdmins(ctx context.Context) (int64, error) {
 	var n int64
-	err := r.db.WithContext(ctx).Table("auth.users u").
-		Joins("JOIN auth.user_roles ur ON ur.user_id = u.id").
-		Joins("JOIN auth.roles r ON r.id = ur.role_id").
+	err := r.db.WithContext(ctx).Table("users u").
+		Joins("JOIN user_roles ur ON ur.user_id = u.id").
+		Joins("JOIN roles r ON r.id = ur.role_id").
 		Where("r.code = ? AND u.status = ?", domain.RoleAdminCode, domain.UserStatusActive).
 		Distinct("u.id").Count(&n).Error
 	return n, err
@@ -182,15 +182,15 @@ func (r *UserRepo) replaceLinks(ctx context.Context, table, col, userID string, 
 }
 
 func (r *UserRepo) SetRoles(ctx context.Context, userID string, roleIDs []string) error {
-	return r.replaceLinks(ctx, "auth.user_roles", "role_id", userID, roleIDs)
+	return r.replaceLinks(ctx, "user_roles", "role_id", userID, roleIDs)
 }
 
 func (r *UserRepo) SetRegions(ctx context.Context, userID string, regionIDs []string) error {
-	return r.replaceLinks(ctx, "auth.user_regions", "region_id", userID, regionIDs)
+	return r.replaceLinks(ctx, "user_regions", "region_id", userID, regionIDs)
 }
 
 func (r *UserRepo) SetDepartments(ctx context.Context, userID string, departmentIDs []string) error {
-	return r.replaceLinks(ctx, "auth.user_departments", "department_id", userID, departmentIDs)
+	return r.replaceLinks(ctx, "user_departments", "department_id", userID, departmentIDs)
 }
 
 func (r *UserRepo) pluckCodes(ctx context.Context, refTable, linkTable, linkCol, userID string) ([]string, error) {
@@ -207,15 +207,15 @@ func (r *UserRepo) pluckCodes(ctx context.Context, refTable, linkTable, linkCol,
 }
 
 func (r *UserRepo) RoleCodesByUser(ctx context.Context, userID string) ([]string, error) {
-	return r.pluckCodes(ctx, "auth.roles", "auth.user_roles", "role_id", userID)
+	return r.pluckCodes(ctx, "roles", "user_roles", "role_id", userID)
 }
 
 func (r *UserRepo) RegionCodesByUser(ctx context.Context, userID string) ([]string, error) {
-	return r.pluckCodes(ctx, "auth.regions", "auth.user_regions", "region_id", userID)
+	return r.pluckCodes(ctx, "regions", "user_regions", "region_id", userID)
 }
 
 func (r *UserRepo) DepartmentCodesByUser(ctx context.Context, userID string) ([]string, error) {
-	return r.pluckCodes(ctx, "auth.departments", "auth.user_departments", "department_id", userID)
+	return r.pluckCodes(ctx, "departments", "user_departments", "department_id", userID)
 }
 
 // --- RoleRepo ---
@@ -264,8 +264,8 @@ func (r *RoleRepo) RolesByUser(ctx context.Context, userID string) ([]domain.Rol
 		return nil, domain.ErrNotFound
 	}
 	var models []RoleModel
-	err = r.db.WithContext(ctx).Table("auth.roles r").
-		Joins("JOIN auth.user_roles ur ON ur.role_id = r.id").
+	err = r.db.WithContext(ctx).Table("roles r").
+		Joins("JOIN user_roles ur ON ur.role_id = r.id").
 		Where("ur.user_id = ?", uid).Order("r.code").Find(&models).Error
 	if err != nil {
 		return nil, err

@@ -44,9 +44,6 @@ func Run(cfg *config.Config) error {
 	}
 	defer sqlDB.Close()
 
-	if err := postgres.EnsureSchemas(db, "auth", "reporter"); err != nil {
-		return err
-	}
 	if err := authrepo.Migrate(db); err != nil {
 		return err
 	}
