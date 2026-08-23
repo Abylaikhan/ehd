@@ -49,11 +49,22 @@ func requestLogger(log *zap.Logger) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		start := time.Now()
 		err := c.Next()
+		// ErrorHandler выставляет статус ПОЗЖЕ этого middleware, поэтому при ошибке
+		// берём фактический статус из возвращённой ошибки, а не из ещё не записанного ответа.
+		status := c.Response().StatusCode()
+		if err != nil {
+			var apiErr *APIError
+			if errors.As(err, &apiErr) {
+				status = apiErr.Status
+			} else {
+				status = fiber.StatusInternalServerError
+			}
+		}
 		log.Info("http",
 			zap.String("request_id", requestID(c)),
 			zap.String("method", c.Method()),
 			zap.String("path", c.Path()),
-			zap.Int("status", c.Response().StatusCode()),
+			zap.Int("status", status),
 			zap.Int64("duration_ms", time.Since(start).Milliseconds()),
 		)
 		return err

@@ -207,6 +207,25 @@ func TestSessionLifecycleAndExpiry(t *testing.T) {
 	}
 }
 
+func TestChangePasswordSetsWhenNoPassword(t *testing.T) {
+	base := time.Unix(1_700_000_000, 0)
+	svc, users := newTestService(t, func() time.Time { return base })
+	users.byID["u1"] = &domain.User{ID: "u1", Login: "eds_x", Status: domain.UserStatusPending, PasswordHash: nil}
+	ctx := context.Background()
+
+	// пароля нет (вход по ЭЦП) — можно задать первый без старого
+	if err := svc.ChangePassword(ctx, "u1", "", "NewPass1"); err != nil {
+		t.Fatalf("set password without existing: %v", err)
+	}
+	if users.byID["u1"].PasswordHash == nil {
+		t.Fatal("password was not set")
+	}
+	// теперь пароль есть — неверный старый отклоняется
+	if err := svc.ChangePassword(ctx, "u1", "wrong", "NewPass2"); !errors.Is(err, domain.ErrInvalidCredentials) {
+		t.Fatalf("with password + wrong old: want ErrInvalidCredentials, got %v", err)
+	}
+}
+
 func TestRegisterRejectsDuplicateIIN(t *testing.T) {
 	base := time.Unix(1_700_000_000, 0)
 	svc, _ := newTestService(t, func() time.Time { return base })

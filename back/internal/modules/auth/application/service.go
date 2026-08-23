@@ -181,14 +181,18 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 	return s.sessions.RevokeByTokenHash(ctx, hashToken(token), s.now())
 }
 
-// ChangePassword — обязательная смена временного/текущего пароля (FR-6).
+// ChangePassword — смена/установка пароля (FR-6).
+// Если пароль уже задан — требуется корректный текущий; если пароля нет (вход по ЭЦП),
+// пользователь задаёт первый пароль без старого (личность подтверждена активной сессией).
 func (s *Service) ChangePassword(ctx context.Context, userID, oldPw, newPw string) error {
 	u, err := s.users.GetByID(ctx, userID)
 	if err != nil {
 		return err
 	}
-	if u.PasswordHash == nil || bcrypt.CompareHashAndPassword([]byte(*u.PasswordHash), []byte(oldPw)) != nil {
-		return domain.ErrInvalidCredentials
+	if u.PasswordHash != nil {
+		if bcrypt.CompareHashAndPassword([]byte(*u.PasswordHash), []byte(oldPw)) != nil {
+			return domain.ErrInvalidCredentials
+		}
 	}
 	if err := domain.ValidatePassword(newPw); err != nil {
 		return err
@@ -233,6 +237,7 @@ func (s *Service) CurrentUser(ctx context.Context, token string) (contract.Ident
 		UserID:          u.ID,
 		Login:           u.Login,
 		IsAdmin:         contains(roleCodes, domain.RoleAdminCode),
+		HasPassword:     u.PasswordHash != nil,
 		RoleCodes:       roleCodes,
 		RegionCodes:     regionCodes,
 		DepartmentCodes: deptCodes,
@@ -257,7 +262,7 @@ func (s *Service) EDSVerify(ctx context.Context, challenge, signedData string) (
 	}
 	sd, err := s.eds.Verify(challenge, signedData)
 	if err != nil || !sd.Valid {
-		return nil, domain.ErrInvalidCredentials
+		return nil, domain.ErrEDSVerification
 	}
 	if err := domain.ValidateIIN(sd.IIN); err != nil {
 		return nil, err

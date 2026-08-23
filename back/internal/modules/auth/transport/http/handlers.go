@@ -123,7 +123,7 @@ func (h *Handler) changePassword(c *fiber.Ctx) error {
 func (h *Handler) me(c *fiber.Ctx) error {
 	id, _ := identityFrom(c)
 	return c.JSON(meResp{
-		UserID: id.UserID, Login: id.Login, IsAdmin: id.IsAdmin,
+		UserID: id.UserID, Login: id.Login, IsAdmin: id.IsAdmin, HasPassword: id.HasPassword,
 		Roles: emptyIfNil(id.RoleCodes), RegionCodes: emptyIfNil(id.RegionCodes), DepartmentCodes: emptyIfNil(id.DepartmentCodes),
 	})
 }
@@ -257,6 +257,8 @@ func (h *Handler) mapErr(err error) error {
 		return httpserver.NewError(fiber.StatusUnauthorized, "UNAUTHENTICATED", "Сессия недействительна или истекла")
 	case errors.Is(err, domain.ErrChallengeInvalid):
 		return httpserver.NewError(fiber.StatusBadRequest, "EDS_CHALLENGE_INVALID", "ЭЦП-challenge недействителен или истёк")
+	case errors.Is(err, domain.ErrEDSVerification):
+		return httpserver.NewError(fiber.StatusUnauthorized, "EDS_VERIFICATION_FAILED", "Подпись ЭЦП не прошла проверку")
 	case errors.Is(err, domain.ErrLastAdmin):
 		return httpserver.NewError(fiber.StatusConflict, "LAST_ADMIN", "Нельзя заблокировать/разжаловать последнего администратора")
 	case errors.Is(err, domain.ErrNotFound):
