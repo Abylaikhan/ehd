@@ -41,6 +41,12 @@ func (r *fakeViewRepo) GetView(context.Context, string) (domain.DataView, error)
 	}
 	return r.view, nil
 }
+func (r *fakeViewRepo) GetViewBySlug(context.Context, string) (domain.DataView, error) {
+	if r.viewErr != nil {
+		return domain.DataView{}, r.viewErr
+	}
+	return r.view, nil
+}
 func (r *fakeViewRepo) ListViews(context.Context) ([]domain.DataView, error) { return nil, nil }
 func (r *fakeViewRepo) UpdateViewMeta(_ context.Context, v domain.DataView) (domain.DataView, error) {
 	r.view = v

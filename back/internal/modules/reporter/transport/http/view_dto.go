@@ -19,16 +19,20 @@ type createViewReq struct {
 }
 
 type updateViewReq struct {
-	Name              string `json:"name"`
-	Slug              string `json:"slug"`
-	Description       string `json:"description"`
-	PageSizeDefault   int    `json:"page_size_default"`
-	PageSizeMin       int    `json:"page_size_min"`
-	PageSizeMax       int    `json:"page_size_max"`
-	DefaultSortColumn string `json:"default_sort_column"`
-	DefaultSortDir    string `json:"default_sort_dir"`
-	ExportRowLimit    int    `json:"export_row_limit"`
-	RowScopeMode      string `json:"row_scope_mode"`
+	Name                     string `json:"name"`
+	Slug                     string `json:"slug"`
+	Description              string `json:"description"`
+	PageSizeDefault          int    `json:"page_size_default"`
+	PageSizeMin              int    `json:"page_size_min"`
+	PageSizeMax              int    `json:"page_size_max"`
+	DefaultSortColumn        string `json:"default_sort_column"`
+	DefaultSortDir           string `json:"default_sort_dir"`
+	ExportRowLimit           int    `json:"export_row_limit"`
+	RowScopeMode             string `json:"row_scope_mode"`
+	KeysetColumn             string `json:"keyset_column"`
+	KeysetDir                string `json:"keyset_dir"`
+	RowScopeRegionColumn     string `json:"row_scope_region_column"`
+	RowScopeDepartmentColumn string `json:"row_scope_department_column"`
 }
 
 type columnConfigReq struct {
@@ -71,27 +75,31 @@ func (r columnsReq) toInput() []application.ColumnConfigInput {
 // --- ответы ---
 
 type viewResp struct {
-	ID                string     `json:"id"`
-	Name              string     `json:"name"`
-	Slug              string     `json:"slug"`
-	Description       string     `json:"description"`
-	DataSourceID      string     `json:"data_source_id"`
-	DatabaseName      string     `json:"database"`
-	TableName         string     `json:"table"`
-	SourceMode        string     `json:"source_mode"`
-	Status            string     `json:"status"`
-	Revision          int64      `json:"revision"`
-	SchemaHash        string     `json:"schema_hash"`
-	PageSizeDefault   int        `json:"page_size_default"`
-	PageSizeMin       int        `json:"page_size_min"`
-	PageSizeMax       int        `json:"page_size_max"`
-	DefaultSortColumn string     `json:"default_sort_column"`
-	DefaultSortDir    string     `json:"default_sort_dir"`
-	ExportRowLimit    int        `json:"export_row_limit"`
-	RowScopeMode      string     `json:"row_scope_mode"`
-	PublishedAt       *time.Time `json:"published_at"`
-	CreatedAt         time.Time  `json:"created_at"`
-	UpdatedAt         time.Time  `json:"updated_at"`
+	ID                       string     `json:"id"`
+	Name                     string     `json:"name"`
+	Slug                     string     `json:"slug"`
+	Description              string     `json:"description"`
+	DataSourceID             string     `json:"data_source_id"`
+	DatabaseName             string     `json:"database"`
+	TableName                string     `json:"table"`
+	SourceMode               string     `json:"source_mode"`
+	Status                   string     `json:"status"`
+	Revision                 int64      `json:"revision"`
+	SchemaHash               string     `json:"schema_hash"`
+	PageSizeDefault          int        `json:"page_size_default"`
+	PageSizeMin              int        `json:"page_size_min"`
+	PageSizeMax              int        `json:"page_size_max"`
+	DefaultSortColumn        string     `json:"default_sort_column"`
+	DefaultSortDir           string     `json:"default_sort_dir"`
+	ExportRowLimit           int        `json:"export_row_limit"`
+	RowScopeMode             string     `json:"row_scope_mode"`
+	KeysetColumn             string     `json:"keyset_column"`
+	KeysetDir                string     `json:"keyset_dir"`
+	RowScopeRegionColumn     string     `json:"row_scope_region_column"`
+	RowScopeDepartmentColumn string     `json:"row_scope_department_column"`
+	PublishedAt              *time.Time `json:"published_at"`
+	CreatedAt                time.Time  `json:"created_at"`
+	UpdatedAt                time.Time  `json:"updated_at"`
 }
 
 func toViewResp(v domain.DataView) viewResp {
@@ -102,6 +110,8 @@ func toViewResp(v domain.DataView) viewResp {
 		PageSizeDefault: v.PageSizeDefault, PageSizeMin: v.PageSizeMin, PageSizeMax: v.PageSizeMax,
 		DefaultSortColumn: v.DefaultSortColumn, DefaultSortDir: v.DefaultSortDir,
 		ExportRowLimit: v.ExportRowLimit, RowScopeMode: v.RowScopeMode,
+		KeysetColumn: v.KeysetColumn, KeysetDir: v.KeysetDir,
+		RowScopeRegionColumn: v.RowScopeRegionColumn, RowScopeDepartmentColumn: v.RowScopeDepartmentColumn,
 		PublishedAt: v.PublishedAt, CreatedAt: v.CreatedAt, UpdatedAt: v.UpdatedAt,
 	}
 }

@@ -31,6 +31,20 @@ func tokenFromRequest(c *fiber.Ctx) string {
 	return ""
 }
 
+// RequireAuth пропускает любого пользователя с активной сессией (пользовательские маршруты).
+func (g *Guard) RequireAuth(c *fiber.Ctx) error {
+	token := tokenFromRequest(c)
+	if token == "" {
+		return httpserver.NewError(fiber.StatusUnauthorized, "UNAUTHENTICATED", "Требуется аутентификация")
+	}
+	id, err := g.provider.CurrentUser(c.UserContext(), token)
+	if err != nil {
+		return httpserver.NewError(fiber.StatusUnauthorized, "UNAUTHENTICATED", "Сессия недействительна или истекла")
+	}
+	c.Locals(identityKey, id)
+	return c.Next()
+}
+
 // RequireAdmin пропускает только администратора с активной сессией (REP-FR-002, RBAC на backend).
 func (g *Guard) RequireAdmin(c *fiber.Ctx) error {
 	token := tokenFromRequest(c)

@@ -40,4 +40,12 @@ func Register(r fiber.Router, h *Handler, guard *Guard) {
 	views.Put("/:id/permissions", h.setViewPermissions)
 	views.Post("/:id/publish", h.publishView)
 	views.Post("/:id/disable", h.disableView)
+	views.Post("/:id/preview", h.previewView) // админ-предпросмотр черновика
+
+	// пользовательские представления (активная сессия, RBAC по ролям snapshot)
+	user := r.Group("", guard.RequireAuth)
+	user.Get("/views", h.listUserViews)
+	user.Get("/views/:slug", h.userViewMeta)
+	user.Post("/views/:slug/query", h.userQuery)
+	user.Post("/views/:slug/count", h.userCount)
 }

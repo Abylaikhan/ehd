@@ -18,6 +18,7 @@ import (
 type ViewRepo interface {
 	CreateView(ctx context.Context, v domain.DataView, cols []domain.ViewColumn) (domain.DataView, error)
 	GetView(ctx context.Context, id string) (domain.DataView, error)
+	GetViewBySlug(ctx context.Context, slug string) (domain.DataView, error)
 	ListViews(ctx context.Context) ([]domain.DataView, error)
 	UpdateViewMeta(ctx context.Context, v domain.DataView) (domain.DataView, error)
 	SetStatus(ctx context.Context, id, status string) error
@@ -100,7 +101,11 @@ func (s *ViewService) CreateView(ctx context.Context, in CreateViewInput) (domai
 	}
 
 	viewCols := make([]domain.ViewColumn, len(cols))
+	keyset := cols[0].Name // стабильный ключ по умолчанию — первичный ключ таблицы, иначе первая колонка
 	for i, c := range cols {
+		if c.InPrimaryKey && keyset == cols[0].Name {
+			keyset = c.Name
+		}
 		viewCols[i] = domain.ViewColumn{
 			SourceName:  c.Name,
 			SourceType:  c.Type,
@@ -110,6 +115,13 @@ func (s *ViewService) CreateView(ctx context.Context, in CreateViewInput) (domai
 			Visible:     false,
 			MaskRule:    domain.MaskNone,
 			Format:      "{}",
+		}
+	}
+	// первый первичный ключ приоритетнее (перебираем явно)
+	for _, c := range cols {
+		if c.InPrimaryKey {
+			keyset = c.Name
+			break
 		}
 	}
 
@@ -125,6 +137,8 @@ func (s *ViewService) CreateView(ctx context.Context, in CreateViewInput) (domai
 		PageSizeMax:     domain.MaxPageSize,
 		ExportRowLimit:  domain.MaxExportRows,
 		RowScopeMode:    domain.RowScopeByProfile,
+		KeysetColumn:    keyset,
+		KeysetDir:       domain.SortAsc,
 	}
 	return s.repo.CreateView(ctx, view, viewCols)
 }
@@ -153,16 +167,20 @@ func (s *ViewService) ListViews(ctx context.Context) ([]domain.DataView, error) 
 
 // UpdateViewInput — обновление мета-данных и параметров.
 type UpdateViewInput struct {
-	Name              string
-	Slug              string
-	Description       string
-	PageSizeDefault   int
-	PageSizeMin       int
-	PageSizeMax       int
-	DefaultSortColumn string
-	DefaultSortDir    string
-	ExportRowLimit    int
-	RowScopeMode      string
+	Name                     string
+	Slug                     string
+	Description              string
+	PageSizeDefault          int
+	PageSizeMin              int
+	PageSizeMax              int
+	DefaultSortColumn        string
+	DefaultSortDir           string
+	ExportRowLimit           int
+	RowScopeMode             string
+	KeysetColumn             string
+	KeysetDir                string
+	RowScopeRegionColumn     string
+	RowScopeDepartmentColumn string
 }
 
 // UpdateView обновляет мета и параметры; опубликованное представление переводится в draft (REP-FR-043).
@@ -203,6 +221,14 @@ func (s *ViewService) UpdateView(ctx context.Context, id string, in UpdateViewIn
 	v.DefaultSortDir = in.DefaultSortDir
 	v.ExportRowLimit = in.ExportRowLimit
 	v.RowScopeMode = in.RowScopeMode
+	if in.KeysetColumn != "" {
+		v.KeysetColumn = in.KeysetColumn
+	}
+	if in.KeysetDir == domain.SortAsc || in.KeysetDir == domain.SortDesc {
+		v.KeysetDir = in.KeysetDir
+	}
+	v.RowScopeRegionColumn = in.RowScopeRegionColumn
+	v.RowScopeDepartmentColumn = in.RowScopeDepartmentColumn
 	v.Status = draftAfterEdit(v.Status)
 	return s.repo.UpdateViewMeta(ctx, v)
 }
@@ -375,7 +401,14 @@ func (s *ViewService) Publish(ctx context.Context, id string) (domain.DataView, 
 		return domain.DataView{}, domain.ErrPublishValidation
 	}
 
-	snap := buildSnapshot(v, visible, roles)
+	keysetType := ""
+	for _, c := range cols {
+		if c.SourceName == v.KeysetColumn {
+			keysetType = c.SourceType
+			break
+		}
+	}
+	snap := buildSnapshot(v, visible, roles, keysetType)
 	snap.SchemaHash = schemaHash(snap.Columns)
 	payload, err := json.Marshal(snap)
 	if err != nil {
@@ -447,7 +480,7 @@ func visibleColumns(cols []domain.ViewColumn) []domain.ViewColumn {
 	return out
 }
 
-func buildSnapshot(v domain.DataView, visible []domain.ViewColumn, roles []string) domain.PublishedSnapshot {
+func buildSnapshot(v domain.DataView, visible []domain.ViewColumn, roles []string, keysetType string) domain.PublishedSnapshot {
 	cols := make([]domain.SnapshotColumn, len(visible))
 	for i, c := range visible {
 		cols[i] = domain.SnapshotColumn{
@@ -465,18 +498,27 @@ func buildSnapshot(v domain.DataView, visible []domain.ViewColumn, roles []strin
 			NullLabel:   c.NullLabel,
 		}
 	}
+	dir := v.KeysetDir
+	if dir == "" {
+		dir = domain.SortAsc
+	}
 	return domain.PublishedSnapshot{
-		DatabaseName:      v.DatabaseName,
-		TableName:         v.TableName,
-		PageSizeDefault:   v.PageSizeDefault,
-		PageSizeMin:       v.PageSizeMin,
-		PageSizeMax:       v.PageSizeMax,
-		DefaultSortColumn: v.DefaultSortColumn,
-		DefaultSortDir:    v.DefaultSortDir,
-		ExportRowLimit:    v.ExportRowLimit,
-		RowScopeMode:      v.RowScopeMode,
-		RoleCodes:         roles,
-		Columns:           cols,
+		DatabaseName:             v.DatabaseName,
+		TableName:                v.TableName,
+		PageSizeDefault:          v.PageSizeDefault,
+		PageSizeMin:              v.PageSizeMin,
+		PageSizeMax:              v.PageSizeMax,
+		DefaultSortColumn:        v.DefaultSortColumn,
+		DefaultSortDir:           v.DefaultSortDir,
+		ExportRowLimit:           v.ExportRowLimit,
+		RowScopeMode:             v.RowScopeMode,
+		RoleCodes:                roles,
+		Columns:                  cols,
+		KeysetColumn:             v.KeysetColumn,
+		KeysetType:               keysetType,
+		KeysetDir:                dir,
+		RowScopeRegionColumn:     v.RowScopeRegionColumn,
+		RowScopeDepartmentColumn: v.RowScopeDepartmentColumn,
 	}
 }
 

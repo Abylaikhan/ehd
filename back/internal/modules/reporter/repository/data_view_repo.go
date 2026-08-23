@@ -20,27 +20,31 @@ func NewDataViewRepo(db *gorm.DB) *DataViewRepo { return &DataViewRepo{db: db} }
 
 func toDomainView(m DataViewModel) domain.DataView {
 	return domain.DataView{
-		ID:                m.ID.String(),
-		Name:              m.Name,
-		Slug:              m.Slug,
-		Description:       m.Description,
-		DataSourceID:      m.DataSourceID.String(),
-		DatabaseName:      m.DatabaseName,
-		TableName:         m.SourceTable,
-		SourceMode:        m.SourceMode,
-		Status:            m.Status,
-		Revision:          m.Revision,
-		SchemaHash:        m.SchemaHash,
-		PageSizeDefault:   m.PageSizeDefault,
-		PageSizeMin:       m.PageSizeMin,
-		PageSizeMax:       m.PageSizeMax,
-		DefaultSortColumn: m.DefaultSortColumn,
-		DefaultSortDir:    m.DefaultSortDir,
-		ExportRowLimit:    m.ExportRowLimit,
-		RowScopeMode:      m.RowScopeMode,
-		PublishedAt:       m.PublishedAt,
-		CreatedAt:         m.CreatedAt,
-		UpdatedAt:         m.UpdatedAt,
+		ID:                       m.ID.String(),
+		Name:                     m.Name,
+		Slug:                     m.Slug,
+		Description:              m.Description,
+		DataSourceID:             m.DataSourceID.String(),
+		DatabaseName:             m.DatabaseName,
+		TableName:                m.SourceTable,
+		SourceMode:               m.SourceMode,
+		Status:                   m.Status,
+		Revision:                 m.Revision,
+		SchemaHash:               m.SchemaHash,
+		PageSizeDefault:          m.PageSizeDefault,
+		PageSizeMin:              m.PageSizeMin,
+		PageSizeMax:              m.PageSizeMax,
+		DefaultSortColumn:        m.DefaultSortColumn,
+		DefaultSortDir:           m.DefaultSortDir,
+		ExportRowLimit:           m.ExportRowLimit,
+		RowScopeMode:             m.RowScopeMode,
+		KeysetColumn:             m.KeysetColumn,
+		KeysetDir:                m.KeysetDir,
+		RowScopeRegionColumn:     m.RowScopeRegionColumn,
+		RowScopeDepartmentColumn: m.RowScopeDepartmentColumn,
+		PublishedAt:              m.PublishedAt,
+		CreatedAt:                m.CreatedAt,
+		UpdatedAt:                m.UpdatedAt,
 	}
 }
 
@@ -99,20 +103,24 @@ func (r *DataViewRepo) CreateView(ctx context.Context, v domain.DataView, cols [
 		return domain.DataView{}, domain.ErrSourceNotFound
 	}
 	m := DataViewModel{
-		ID:              uuid.New(),
-		Name:            v.Name,
-		Slug:            v.Slug,
-		Description:     v.Description,
-		DataSourceID:    srcID,
-		DatabaseName:    v.DatabaseName,
-		SourceTable:     v.TableName,
-		SourceMode:      domain.SourceModePhysicalObject,
-		Status:          domain.ViewStatusDraft,
-		PageSizeDefault: v.PageSizeDefault,
-		PageSizeMin:     v.PageSizeMin,
-		PageSizeMax:     v.PageSizeMax,
-		ExportRowLimit:  v.ExportRowLimit,
-		RowScopeMode:    v.RowScopeMode,
+		ID:                       uuid.New(),
+		Name:                     v.Name,
+		Slug:                     v.Slug,
+		Description:              v.Description,
+		DataSourceID:             srcID,
+		DatabaseName:             v.DatabaseName,
+		SourceTable:              v.TableName,
+		SourceMode:               domain.SourceModePhysicalObject,
+		Status:                   domain.ViewStatusDraft,
+		PageSizeDefault:          v.PageSizeDefault,
+		PageSizeMin:              v.PageSizeMin,
+		PageSizeMax:              v.PageSizeMax,
+		ExportRowLimit:           v.ExportRowLimit,
+		RowScopeMode:             v.RowScopeMode,
+		KeysetColumn:             v.KeysetColumn,
+		KeysetDir:                v.KeysetDir,
+		RowScopeRegionColumn:     v.RowScopeRegionColumn,
+		RowScopeDepartmentColumn: v.RowScopeDepartmentColumn,
 	}
 	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&m).Error; err != nil {
@@ -147,6 +155,18 @@ func (r *DataViewRepo) GetView(ctx context.Context, id string) (domain.DataView,
 	return toDomainView(m), nil
 }
 
+// GetViewBySlug возвращает представление по slug (для пользовательского запроса данных).
+func (r *DataViewRepo) GetViewBySlug(ctx context.Context, slug string) (domain.DataView, error) {
+	var m DataViewModel
+	if err := r.db.WithContext(ctx).First(&m, "slug = ?", slug).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.DataView{}, domain.ErrViewNotFound
+		}
+		return domain.DataView{}, err
+	}
+	return toDomainView(m), nil
+}
+
 func (r *DataViewRepo) ListViews(ctx context.Context) ([]domain.DataView, error) {
 	var ms []DataViewModel
 	if err := r.db.WithContext(ctx).Order("created_at").Find(&ms).Error; err != nil {
@@ -166,17 +186,21 @@ func (r *DataViewRepo) UpdateViewMeta(ctx context.Context, v domain.DataView) (d
 		return domain.DataView{}, domain.ErrViewNotFound
 	}
 	updates := map[string]any{
-		"name":                v.Name,
-		"slug":                v.Slug,
-		"description":         v.Description,
-		"page_size_default":   v.PageSizeDefault,
-		"page_size_min":       v.PageSizeMin,
-		"page_size_max":       v.PageSizeMax,
-		"default_sort_column": v.DefaultSortColumn,
-		"default_sort_dir":    v.DefaultSortDir,
-		"export_row_limit":    v.ExportRowLimit,
-		"row_scope_mode":      v.RowScopeMode,
-		"status":              v.Status,
+		"name":                        v.Name,
+		"slug":                        v.Slug,
+		"description":                 v.Description,
+		"page_size_default":           v.PageSizeDefault,
+		"page_size_min":               v.PageSizeMin,
+		"page_size_max":               v.PageSizeMax,
+		"default_sort_column":         v.DefaultSortColumn,
+		"default_sort_dir":            v.DefaultSortDir,
+		"export_row_limit":            v.ExportRowLimit,
+		"row_scope_mode":              v.RowScopeMode,
+		"keyset_column":               v.KeysetColumn,
+		"keyset_dir":                  v.KeysetDir,
+		"row_scope_region_column":     v.RowScopeRegionColumn,
+		"row_scope_department_column": v.RowScopeDepartmentColumn,
+		"status":                      v.Status,
 	}
 	res := r.db.WithContext(ctx).Model(&DataViewModel{}).Where("id = ?", uid).Updates(updates)
 	if res.Error != nil {
