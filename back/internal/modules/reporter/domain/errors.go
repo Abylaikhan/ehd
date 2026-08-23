@@ -27,4 +27,15 @@ var (
 	ErrTableNotFound = errors.New("таблица не найдена в источнике")
 	// ErrSourceInactive — источник не активен, представление к нему нельзя создать/опубликовать.
 	ErrSourceInactive = errors.New("источник не активен")
+
+	// --- Query Engine ---
+
+	// ErrAccessDenied — у пользователя нет роли, дающей доступ к представлению (REP-FR-053).
+	ErrAccessDenied = errors.New("нет доступа к представлению")
+	// ErrSourceUnavailable — источник недоступен/деактивирован во время запроса.
+	ErrSourceUnavailable = errors.New("источник недоступен")
+	// ErrQueryValidation — QuerySpec нарушает whitelist/операторы/типы (Принцип 3).
+	ErrQueryValidation = errors.New("некорректный запрос данных")
+	// ErrViewNotConfigured — у представления не задан стабильный ключ для keyset-пагинации.
+	ErrViewNotConfigured = errors.New("представление не сконфигурировано для запросов")
 )

@@ -52,6 +52,8 @@ func (h *Handler) updateView(c *fiber.Ctx) error {
 		PageSizeDefault: req.PageSizeDefault, PageSizeMin: req.PageSizeMin, PageSizeMax: req.PageSizeMax,
 		DefaultSortColumn: req.DefaultSortColumn, DefaultSortDir: req.DefaultSortDir,
 		ExportRowLimit: req.ExportRowLimit, RowScopeMode: req.RowScopeMode,
+		KeysetColumn: req.KeysetColumn, KeysetDir: req.KeysetDir,
+		RowScopeRegionColumn: req.RowScopeRegionColumn, RowScopeDepartmentColumn: req.RowScopeDepartmentColumn,
 	})
 	if err != nil {
 		return mapErr(err)

@@ -37,12 +37,14 @@ type ConnParams struct {
 	Database      string
 }
 
-// SourceConn — открытое подключение к источнику для проверки и интроспекции.
+// SourceConn — открытое подключение к источнику для проверки, интроспекции и выполнения запросов.
 type SourceConn interface {
 	Ping(ctx context.Context) error
 	Databases(ctx context.Context) ([]string, error)
 	Tables(ctx context.Context, db string) ([]domain.Table, error)
 	Columns(ctx context.Context, db, table string) ([]domain.Column, error)
+	Query(ctx context.Context, sql string, args ...any) ([]map[string]any, error)
+	ScalarUint64(ctx context.Context, sql string, args ...any) (uint64, error)
 	Close() error
 }
 
@@ -261,6 +263,26 @@ func (s *Service) Columns(ctx context.Context, id, db, table string) ([]domain.C
 		return nil, domain.ErrConnectionFailed
 	}
 	return cols, nil
+}
+
+// RunQuery выполняет проверенный SELECT на подключении к источнику (для Query Engine).
+func (s *Service) RunQuery(ctx context.Context, sourceID, database, sql string, args []any) ([]map[string]any, error) {
+	conn, err := s.open(ctx, sourceID, database)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	return conn.Query(ctx, sql, args...)
+}
+
+// ScalarCount выполняет COUNT-запрос и возвращает целое (для total_count).
+func (s *Service) ScalarCount(ctx context.Context, sourceID, database, sql string, args []any) (uint64, error) {
+	conn, err := s.open(ctx, sourceID, database)
+	if err != nil {
+		return 0, err
+	}
+	defer conn.Close()
+	return conn.ScalarUint64(ctx, sql, args...)
 }
 
 // open открывает подключение к сохранённому источнику (с расшифровкой секрета).

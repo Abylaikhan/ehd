@@ -4,6 +4,7 @@ package chsource
 
 import (
 	"context"
+	"reflect"
 
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 
@@ -76,6 +77,46 @@ func (c *sourceConn) Columns(ctx context.Context, db, table string) ([]domain.Co
 		}
 	}
 	return out, nil
+}
+
+// Query выполняет параметризованный SELECT и возвращает строки как map[колонка]значение.
+// Значения сканируются динамически по типам ответа ClickHouse.
+func (c *sourceConn) Query(ctx context.Context, sql string, args ...any) ([]map[string]any, error) {
+	rows, err := c.conn.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	cols := rows.Columns()
+	types := rows.ColumnTypes()
+	var out []map[string]any
+	for rows.Next() {
+		// типизированный скан: clickhouse-go не поддерживает *interface{},
+		// поэтому под каждую колонку выделяем указатель её ScanType.
+		ptrs := make([]any, len(cols))
+		for i := range ptrs {
+			ptrs[i] = reflect.New(types[i].ScanType()).Interface()
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			return nil, err
+		}
+		m := make(map[string]any, len(cols))
+		for i, name := range cols {
+			m[name] = reflect.ValueOf(ptrs[i]).Elem().Interface()
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+// ScalarUint64 выполняет запрос, возвращающий одно целое (например, count()).
+func (c *sourceConn) ScalarUint64(ctx context.Context, sql string, args ...any) (uint64, error) {
+	var n uint64
+	if err := c.conn.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
+		return 0, err
+	}
+	return n, nil
 }
 
 func (c *sourceConn) Close() error { return c.conn.Close() }

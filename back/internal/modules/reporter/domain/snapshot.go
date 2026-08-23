@@ -31,4 +31,11 @@ type PublishedSnapshot struct {
 	RowScopeMode      string           `json:"row_scope_mode"`
 	RoleCodes         []string         `json:"role_codes"`
 	Columns           []SnapshotColumn `json:"columns"`
+
+	// Query Engine (slice 005).
+	KeysetColumn             string `json:"keyset_column"`
+	KeysetType               string `json:"keyset_type"` // физический тип ключа (для типа cursor-параметра)
+	KeysetDir                string `json:"keyset_dir"`
+	RowScopeRegionColumn     string `json:"row_scope_region_column,omitempty"`
+	RowScopeDepartmentColumn string `json:"row_scope_department_column,omitempty"`
 }

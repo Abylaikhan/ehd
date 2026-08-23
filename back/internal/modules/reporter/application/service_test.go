@@ -66,7 +66,11 @@ func (c *fakeConn) Tables(context.Context, string) ([]domain.Table, error) {
 func (c *fakeConn) Columns(context.Context, string, string) ([]domain.Column, error) {
 	return nil, nil
 }
-func (c *fakeConn) Close() error { return nil }
+func (c *fakeConn) Query(context.Context, string, ...any) ([]map[string]any, error) {
+	return nil, nil
+}
+func (c *fakeConn) ScalarUint64(context.Context, string, ...any) (uint64, error) { return 0, nil }
+func (c *fakeConn) Close() error                                                 { return nil }
 
 type fakeConnector struct {
 	openErr error

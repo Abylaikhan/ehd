@@ -47,28 +47,32 @@ func (DataSourceModel) TableName() string { return "data_sources" }
 // DataViewModel — конфигурация представления таблицы (REP-FR-040..044).
 // PublishedSnapshot — неизменяемая опубликованная конфигурация (jsonb) для Query Engine.
 type DataViewModel struct {
-	ID                uuid.UUID `gorm:"type:uuid;primaryKey"`
-	Name              string    `gorm:"size:255;not null"`
-	Slug              string    `gorm:"size:128;not null;uniqueIndex"`
-	Description       string    `gorm:"size:1024"`
-	DataSourceID      uuid.UUID `gorm:"type:uuid;not null;index"`
-	DatabaseName      string    `gorm:"size:255;not null"`
-	SourceTable       string    `gorm:"column:table_name;size:255;not null"`
-	SourceMode        string    `gorm:"size:32;not null;default:physical_object"`
-	Status            string    `gorm:"size:16;not null;default:draft;index"`
-	Revision          int64     `gorm:"not null;default:0"`
-	SchemaHash        string    `gorm:"size:64"`
-	PageSizeDefault   int       `gorm:"not null;default:50"`
-	PageSizeMin       int       `gorm:"not null;default:20"`
-	PageSizeMax       int       `gorm:"not null;default:200"`
-	DefaultSortColumn string    `gorm:"size:255"`
-	DefaultSortDir    string    `gorm:"size:4"`
-	ExportRowLimit    int       `gorm:"not null;default:100000"`
-	RowScopeMode      string    `gorm:"size:16;not null;default:by_profile"`
-	PublishedSnapshot *string   `gorm:"type:jsonb"` // NULL пока не опубликовано (пустая строка — невалидный jsonb)
-	PublishedAt       *time.Time
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	ID                       uuid.UUID `gorm:"type:uuid;primaryKey"`
+	Name                     string    `gorm:"size:255;not null"`
+	Slug                     string    `gorm:"size:128;not null;uniqueIndex"`
+	Description              string    `gorm:"size:1024"`
+	DataSourceID             uuid.UUID `gorm:"type:uuid;not null;index"`
+	DatabaseName             string    `gorm:"size:255;not null"`
+	SourceTable              string    `gorm:"column:table_name;size:255;not null"`
+	SourceMode               string    `gorm:"size:32;not null;default:physical_object"`
+	Status                   string    `gorm:"size:16;not null;default:draft;index"`
+	Revision                 int64     `gorm:"not null;default:0"`
+	SchemaHash               string    `gorm:"size:64"`
+	PageSizeDefault          int       `gorm:"not null;default:50"`
+	PageSizeMin              int       `gorm:"not null;default:20"`
+	PageSizeMax              int       `gorm:"not null;default:200"`
+	DefaultSortColumn        string    `gorm:"size:255"`
+	DefaultSortDir           string    `gorm:"size:4"`
+	ExportRowLimit           int       `gorm:"not null;default:100000"`
+	RowScopeMode             string    `gorm:"size:16;not null;default:by_profile"`
+	KeysetColumn             string    `gorm:"size:255"`
+	KeysetDir                string    `gorm:"size:4;not null;default:asc"`
+	RowScopeRegionColumn     string    `gorm:"size:255"`
+	RowScopeDepartmentColumn string    `gorm:"size:255"`
+	PublishedSnapshot        *string   `gorm:"type:jsonb"` // NULL пока не опубликовано (пустая строка — невалидный jsonb)
+	PublishedAt              *time.Time
+	CreatedAt                time.Time
+	UpdatedAt                time.Time
 }
 
 func (DataViewModel) TableName() string { return "data_views" }

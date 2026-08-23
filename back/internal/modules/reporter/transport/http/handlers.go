@@ -10,14 +10,15 @@ import (
 	"ehd-api/pkg/httpserver"
 )
 
-// Handler — HTTP-хендлеры Reporter Module (источник, интроспекция, представления).
+// Handler — HTTP-хендлеры Reporter Module (источник, интроспекция, представления, запросы).
 type Handler struct {
 	svc   *application.Service
 	views *application.ViewService
+	query *application.QueryService
 }
 
-func NewHandler(svc *application.Service, views *application.ViewService) *Handler {
-	return &Handler{svc: svc, views: views}
+func NewHandler(svc *application.Service, views *application.ViewService, query *application.QueryService) *Handler {
+	return &Handler{svc: svc, views: views, query: query}
 }
 
 func badRequest(field, reason string) *httpserver.APIError {
@@ -182,6 +183,14 @@ func mapErr(err error) error {
 		return httpserver.NewError(fiber.StatusUnprocessableEntity, "PUBLISH_VALIDATION", "Представление не готово к публикации: нужны активный источник, ≥1 видимая колонка, валидный slug и ≥1 роль")
 	case errors.Is(err, domain.ErrViewValidation):
 		return httpserver.NewError(fiber.StatusUnprocessableEntity, "VALIDATION_ERROR", "Некорректные данные представления")
+	case errors.Is(err, domain.ErrAccessDenied):
+		return httpserver.NewError(fiber.StatusForbidden, "ACCESS_DENIED", "Нет доступа к представлению")
+	case errors.Is(err, domain.ErrSourceUnavailable):
+		return httpserver.NewError(fiber.StatusServiceUnavailable, "SOURCE_UNAVAILABLE", "Источник данных недоступен")
+	case errors.Is(err, domain.ErrQueryValidation):
+		return httpserver.NewError(fiber.StatusUnprocessableEntity, "QUERY_VALIDATION", "Некорректный запрос данных")
+	case errors.Is(err, domain.ErrViewNotConfigured):
+		return httpserver.NewError(fiber.StatusUnprocessableEntity, "VIEW_NOT_CONFIGURED", "Представление не сконфигурировано для запросов")
 	default:
 		return httpserver.NewError(fiber.StatusInternalServerError, "INTERNAL_ERROR", "Внутренняя ошибка сервера")
 	}

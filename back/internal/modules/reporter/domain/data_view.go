@@ -63,6 +63,12 @@ type DataView struct {
 	ExportRowLimit    int
 	RowScopeMode      string
 
+	// Конфигурация Query Engine (slice 005).
+	KeysetColumn             string // стабильный ключ для keyset-пагинации (обычно первичный ключ)
+	KeysetDir                string // asc|desc
+	RowScopeRegionColumn     string // физическая колонка для RLS по региону
+	RowScopeDepartmentColumn string // физическая колонка для RLS по подразделению
+
 	PublishedAt *time.Time
 	CreatedAt   time.Time
 	UpdatedAt   time.Time

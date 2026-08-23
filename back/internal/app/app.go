@@ -111,12 +111,14 @@ func Run(cfg *config.Config) error {
 		reporterapp.Config{SystemDBDenylist: cfg.Reporter.SystemDBDenylist},
 		log,
 	)
+	dataViewRepo := reporterrepo.NewDataViewRepo(db)
 	reporterViewService := reporterapp.NewViewService(
-		reporterrepo.NewDataViewRepo(db),
+		dataViewRepo,
 		reporterService, // SourceInspector: проверка активного источника + интроспекция колонок
 		log,
 	)
-	reporterHandler := reporterhttp.NewHandler(reporterService, reporterViewService)
+	reporterQueryService := reporterapp.NewQueryService(dataViewRepo, reporterService, log)
+	reporterHandler := reporterhttp.NewHandler(reporterService, reporterViewService, reporterQueryService)
 	reporterGuard := reporterhttp.NewGuard(authService) // RBAC через auth/contract (без сети)
 
 	// --- ClickHouse (read-only проверка готовности источника по умолчанию) ---
