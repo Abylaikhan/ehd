@@ -152,3 +152,129 @@ export interface QueryResult {
 export interface CountResult {
   total_count: number
 }
+
+// --- Reporter admin: конструктор витрин (backend slices 003–005) ---
+
+export interface DataSourceSummary {
+  id: string
+  code: string
+  name: string
+  host: string
+  port: number
+  protocol: string
+  username: string
+  status: string
+}
+
+export interface IntrospectDatabase {
+  name: string
+}
+
+export interface IntrospectTable {
+  name: string
+  engine: string
+  kind: string
+}
+
+export interface IntrospectColumn {
+  name: string
+  type: string
+  position: number
+  nullable: boolean
+  comment: string
+  in_primary_key: boolean
+  in_sorting_key: boolean
+}
+
+// Полная запись представления (мета + параметры), общая для списка и карточки.
+export interface ViewSummary {
+  id: string
+  name: string
+  slug: string
+  description: string
+  data_source_id: string
+  database: string
+  table: string
+  source_mode: string
+  status: string
+  revision: number
+  schema_hash: string
+  page_size_default: number
+  page_size_min: number
+  page_size_max: number
+  default_sort_column: string
+  default_sort_dir: string
+  export_row_limit: number
+  row_scope_mode: string
+  keyset_column: string
+  keyset_dir: string
+  row_scope_region_column: string
+  row_scope_department_column: string
+  published_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ViewColumnDetail {
+  source_name: string
+  source_type: string
+  label: string
+  display_type: string
+  position: number
+  visible: boolean
+  searchable: boolean
+  filterable: boolean
+  sortable: boolean
+  exportable: boolean
+  format: string
+  mask_rule: string
+  width: number
+  null_label: string
+}
+
+export interface ViewDetail extends ViewSummary {
+  columns: ViewColumnDetail[]
+  role_codes: string[]
+}
+
+export interface CreateViewPayload {
+  name: string
+  slug: string
+  description?: string
+  data_source_id: string
+  database: string
+  table: string
+}
+
+export interface UpdateViewMetaPayload {
+  name: string
+  slug: string
+  description?: string
+  page_size_default: number
+  page_size_min: number
+  page_size_max: number
+  default_sort_column?: string
+  default_sort_dir?: string
+  export_row_limit: number
+  row_scope_mode: string
+  keyset_column?: string
+  keyset_dir?: string
+  row_scope_region_column?: string
+  row_scope_department_column?: string
+}
+
+export interface ColumnConfigPayload {
+  source_name: string
+  label: string
+  display_type: string
+  position: number
+  visible: boolean
+  searchable: boolean
+  filterable: boolean
+  sortable: boolean
+  exportable: boolean
+  format?: string
+  mask_rule?: string
+  width?: number
+  null_label?: string
+}
