@@ -1,12 +1,11 @@
 // Package chsource — driven-адаптер: реализует application.Connector поверх
-// pkg/clickhouse и маппит результаты интроспекции в доменные типы Reporter.
+// pkg/clickhouse (database/sql) и маппит результаты интроспекции в доменные типы Reporter.
 package chsource
 
 import (
 	"context"
+	"database/sql"
 	"reflect"
-
-	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 
 	"ehd-api/internal/modules/reporter/application"
 	"ehd-api/internal/modules/reporter/domain"
@@ -20,7 +19,7 @@ func New() Connector { return Connector{} }
 
 // Open устанавливает подключение по параметрам источника.
 func (Connector) Open(_ context.Context, p application.ConnParams) (application.SourceConn, error) {
-	conn, err := clickhouse.Connect(clickhouse.ConnParams{
+	db, err := clickhouse.Connect(clickhouse.ConnParams{
 		Host:          p.Host,
 		Port:          p.Port,
 		Protocol:      p.Protocol,
@@ -33,22 +32,22 @@ func (Connector) Open(_ context.Context, p application.ConnParams) (application.
 	if err != nil {
 		return nil, err
 	}
-	return &sourceConn{conn: conn}, nil
+	return &sourceConn{db: db}, nil
 }
 
-// sourceConn оборачивает driver.Conn и отдаёт доменные типы.
-type sourceConn struct{ conn driver.Conn }
+// sourceConn оборачивает *sql.DB и отдаёт доменные типы.
+type sourceConn struct{ db *sql.DB }
 
 func (c *sourceConn) Ping(ctx context.Context) error {
-	return clickhouse.PingSelect1(ctx, c.conn)
+	return clickhouse.PingSelect1(ctx, c.db)
 }
 
 func (c *sourceConn) Databases(ctx context.Context) ([]string, error) {
-	return clickhouse.ListDatabases(ctx, c.conn)
+	return clickhouse.ListDatabases(ctx, c.db)
 }
 
 func (c *sourceConn) Tables(ctx context.Context, db string) ([]domain.Table, error) {
-	rows, err := clickhouse.ListTables(ctx, c.conn, db)
+	rows, err := clickhouse.ListTables(ctx, c.db, db)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +59,7 @@ func (c *sourceConn) Tables(ctx context.Context, db string) ([]domain.Table, err
 }
 
 func (c *sourceConn) Columns(ctx context.Context, db, table string) ([]domain.Column, error) {
-	rows, err := clickhouse.ListColumns(ctx, c.conn, db, table)
+	rows, err := clickhouse.ListColumns(ctx, c.db, db, table)
 	if err != nil {
 		return nil, err
 	}
@@ -79,24 +78,35 @@ func (c *sourceConn) Columns(ctx context.Context, db, table string) ([]domain.Co
 	return out, nil
 }
 
-// Query выполняет параметризованный SELECT и возвращает строки как map[колонка]значение.
-// Значения сканируются динамически по типам ответа ClickHouse.
-func (c *sourceConn) Query(ctx context.Context, sql string, args ...any) ([]map[string]any, error) {
-	rows, err := c.conn.Query(ctx, sql, args...)
+// Query выполняет параметризованный SELECT и возвращает строки map[колонка]значение.
+// Скан динамический по ScanType драйвера (clickhouse-go не поддерживает *interface{}).
+func (c *sourceConn) Query(ctx context.Context, query string, args ...any) ([]map[string]any, error) {
+	rows, err := c.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	cols := rows.Columns()
-	types := rows.ColumnTypes()
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+	types, err := rows.ColumnTypes()
+	if err != nil {
+		return nil, err
+	}
+
 	var out []map[string]any
 	for rows.Next() {
-		// типизированный скан: clickhouse-go не поддерживает *interface{},
-		// поэтому под каждую колонку выделяем указатель её ScanType.
 		ptrs := make([]any, len(cols))
 		for i := range ptrs {
-			ptrs[i] = reflect.New(types[i].ScanType()).Interface()
+			st := types[i].ScanType()
+			if st == nil {
+				var v any
+				ptrs[i] = &v
+			} else {
+				ptrs[i] = reflect.New(st).Interface()
+			}
 		}
 		if err := rows.Scan(ptrs...); err != nil {
 			return nil, err
@@ -111,12 +121,12 @@ func (c *sourceConn) Query(ctx context.Context, sql string, args ...any) ([]map[
 }
 
 // ScalarUint64 выполняет запрос, возвращающий одно целое (например, count()).
-func (c *sourceConn) ScalarUint64(ctx context.Context, sql string, args ...any) (uint64, error) {
+func (c *sourceConn) ScalarUint64(ctx context.Context, query string, args ...any) (uint64, error) {
 	var n uint64
-	if err := c.conn.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
+	if err := c.db.QueryRowContext(ctx, query, args...).Scan(&n); err != nil {
 		return 0, err
 	}
 	return n, nil
 }
 
-func (c *sourceConn) Close() error { return c.conn.Close() }
+func (c *sourceConn) Close() error { return c.db.Close() }
