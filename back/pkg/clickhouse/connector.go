@@ -2,11 +2,11 @@ package clickhouse
 
 import (
 	"crypto/tls"
+	"database/sql"
 	"fmt"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
-	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 )
 
 // ConnParams — параметры подключения к конкретному источнику ClickHouse.
@@ -24,8 +24,10 @@ type ConnParams struct {
 }
 
 // Connect открывает read-only подключение к источнику по его параметрам.
+// Используется database/sql (clickhouse.OpenDB): только этот путь поддерживает
+// HTTP-протокол (порт 8123); нативный протокол (9000) тоже работает через него.
 // Соединение ленивое: реальный dial происходит при первом Ping/запросе.
-func Connect(p ConnParams) (driver.Conn, error) {
+func Connect(p ConnParams) (*sql.DB, error) {
 	proto := clickhouse.Native
 	if p.Protocol == "http" {
 		proto = clickhouse.HTTP
@@ -49,5 +51,9 @@ func Connect(p ConnParams) (driver.Conn, error) {
 		opts.TLS = &tls.Config{InsecureSkipVerify: p.TLSSkipVerify} //nolint:gosec
 	}
 
-	return clickhouse.Open(opts)
+	db := clickhouse.OpenDB(opts)
+	db.SetMaxOpenConns(4)
+	db.SetMaxIdleConns(2)
+	db.SetConnMaxLifetime(10 * time.Minute)
+	return db, nil
 }

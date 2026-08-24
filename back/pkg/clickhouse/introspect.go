@@ -2,9 +2,8 @@ package clickhouse
 
 import (
 	"context"
+	"database/sql"
 	"strings"
-
-	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 )
 
 // TableInfo — строка интроспекции таблиц (system.tables).
@@ -26,14 +25,14 @@ type ColumnInfo struct {
 }
 
 // PingSelect1 выполняет безопасный SELECT 1 (REP-FR-011).
-func PingSelect1(ctx context.Context, conn driver.Conn) error {
+func PingSelect1(ctx context.Context, db *sql.DB) error {
 	var one uint8
-	return conn.QueryRow(ctx, "SELECT 1").Scan(&one)
+	return db.QueryRowContext(ctx, "SELECT 1").Scan(&one)
 }
 
 // ListDatabases возвращает имена всех баз (фильтрация системных — на уровне сервиса).
-func ListDatabases(ctx context.Context, conn driver.Conn) ([]string, error) {
-	rows, err := conn.Query(ctx, "SELECT name FROM system.databases ORDER BY name")
+func ListDatabases(ctx context.Context, db *sql.DB) ([]string, error) {
+	rows, err := db.QueryContext(ctx, "SELECT name FROM system.databases ORDER BY name")
 	if err != nil {
 		return nil, err
 	}
@@ -52,8 +51,8 @@ func ListDatabases(ctx context.Context, conn driver.Conn) ([]string, error) {
 
 // ListTables возвращает таблицы/VIEW/MATERIALIZED VIEW выбранной базы.
 // database передаётся типизированным параметром (без конкатенации в SQL).
-func ListTables(ctx context.Context, conn driver.Conn, database string) ([]TableInfo, error) {
-	rows, err := conn.Query(ctx,
+func ListTables(ctx context.Context, db *sql.DB, database string) ([]TableInfo, error) {
+	rows, err := db.QueryContext(ctx,
 		"SELECT name, engine FROM system.tables WHERE database = ? ORDER BY name", database)
 	if err != nil {
 		return nil, err
@@ -72,12 +71,12 @@ func ListTables(ctx context.Context, conn driver.Conn, database string) ([]Table
 }
 
 // ListColumns возвращает колонки таблицы из system.columns.
-func ListColumns(ctx context.Context, conn driver.Conn, database, table string) ([]ColumnInfo, error) {
+func ListColumns(ctx context.Context, db *sql.DB, database, table string) ([]ColumnInfo, error) {
 	const q = `SELECT name, type, position, comment, is_in_primary_key, is_in_sorting_key
 	           FROM system.columns
 	           WHERE database = ? AND table = ?
 	           ORDER BY position`
-	rows, err := conn.Query(ctx, q, database, table)
+	rows, err := db.QueryContext(ctx, q, database, table)
 	if err != nil {
 		return nil, err
 	}
