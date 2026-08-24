@@ -29,37 +29,47 @@ function currentSpec(cursor?: string): QuerySpec {
   return { search: search.value || undefined, page_size: effectivePageSize.value, cursor }
 }
 
-// --- первая страница данных + total_count (реактивно на поиск/размер) ---
+// Данные и total_count грузятся на КЛИЕНТЕ (server:false) и параллельно: на больших таблицах
+// запрос/COUNT долгие — не блокируем SSR, показываем лоадер, каркас (meta) отрендерен на сервере.
 const {
-  data: firstData,
+  data: queryData,
   pending: dataPending,
   error: dataError,
   refresh: refreshData,
-} = await useAsyncData(
-  `view-data-${slug.value}`,
-  async () => {
-    const spec = currentSpec()
-    const [q, c] = await Promise.all([views.query(slug.value, spec), views.count(slug.value, spec)])
-    return { q, c }
-  },
-  { watch: [search, effectivePageSize] },
-)
+} = useLazyAsyncData(`view-data-${slug.value}`, () => views.query(slug.value, currentSpec()), {
+  watch: [search, effectivePageSize],
+  server: false,
+})
+
+const {
+  data: countData,
+  pending: countPending,
+  refresh: refreshCount,
+} = useLazyAsyncData(`view-count-${slug.value}`, () => views.count(slug.value, currentSpec()), {
+  watch: [search, effectivePageSize],
+  server: false,
+})
+
+function reload() {
+  refreshData()
+  refreshCount()
+}
 
 // --- догруженные keyset-страницы ---
 const extraRows = ref<Record<string, unknown>[]>([])
 const nextCursor = ref('')
 watch(
-  firstData,
+  queryData,
   (d) => {
     extraRows.value = []
-    nextCursor.value = d?.q.page.next_cursor ?? ''
+    nextCursor.value = d?.page.next_cursor ?? ''
   },
   { immediate: true },
 )
 
-const columns = computed(() => firstData.value?.q.columns ?? meta.value?.columns ?? [])
-const rows = computed(() => [...(firstData.value?.q.rows ?? []), ...extraRows.value])
-const total = computed(() => firstData.value?.c.total_count ?? 0)
+const columns = computed(() => queryData.value?.columns ?? meta.value?.columns ?? [])
+const rows = computed(() => [...(queryData.value?.rows ?? []), ...extraRows.value])
+const total = computed(() => countData.value?.total_count ?? 0)
 const hasMore = computed(() => nextCursor.value !== '')
 
 const loadingMore = ref(false)
@@ -109,7 +119,7 @@ if (import.meta.client) {
 // --- классификация состояния экрана (ТЗ, Принцип 6) ---
 const errCode = computed(() => apiErrorCode(metaError.value) || apiErrorCode(dataError.value))
 const screenState = computed(() => {
-  if (metaPending.value || (dataPending.value && !firstData.value)) return 'loading'
+  if (metaPending.value) return 'loading'
   switch (errCode.value) {
     case 'ACCESS_DENIED':
       return 'denied'
@@ -119,9 +129,15 @@ const screenState = computed(() => {
       return 'source'
   }
   if (metaError.value || dataError.value) return 'error'
+  if (!queryData.value) return 'loading' // первая порция ещё грузится (клиентский fetch)
   if (rows.value.length === 0) return 'empty'
   return 'ready'
 })
+
+// таблица показывает оверлей-лоадер при любой подгрузке (первичной, поиске, смене размера)
+const tableLoading = computed(() => dataPending.value || loadingMore.value)
+// count готов только когда реально загружен (иначе показываем «…», не «0»)
+const countReady = computed(() => !countPending.value && countData.value != null)
 
 const pageSizeOptions = computed(() => {
   const m = meta.value
@@ -137,6 +153,7 @@ const pageSizeOptions = computed(() => {
       <template #content>
         <div v-if="screenState === 'loading'" class="center">
           <ProgressSpinner style="width: 2.5rem; height: 2.5rem" />
+          <p class="loading-text">Загрузка данных…</p>
         </div>
         <ErrorState
           v-else-if="screenState === 'denied'"
@@ -153,13 +170,13 @@ const pageSizeOptions = computed(() => {
           title="Источник недоступен"
           message="Источник данных временно недоступен. Повторите позже."
           retryable
-          @retry="refreshData"
+          @retry="reload"
         />
         <ErrorState
           v-else-if="screenState === 'error'"
           message="Не удалось загрузить данные витрины."
           retryable
-          @retry="refreshData"
+          @retry="reload"
         />
 
         <template v-else>
@@ -201,7 +218,10 @@ const pageSizeOptions = computed(() => {
             hint="По текущему запросу строк не найдено."
           />
           <template v-else>
-            <DataTable :value="rows" stripedRows size="small" scrollable class="data-table">
+            <DataTable :value="rows" :loading="tableLoading" stripedRows size="small" scrollable class="data-table">
+              <template #loading>
+                <ProgressSpinner style="width: 2rem; height: 2rem" />
+              </template>
               <Column v-for="col in columns" :key="col.source_name" :header="col.label">
                 <template #body="{ data }">
                   {{ formatCell(data[col.source_name], col.display_type) }}
@@ -210,7 +230,11 @@ const pageSizeOptions = computed(() => {
             </DataTable>
 
             <div class="pager">
-              <span class="loaded">Загружено {{ rows.length }} из {{ total }}</span>
+              <span class="loaded">
+                Загружено {{ rows.length }} из
+                <span v-if="countReady">{{ total.toLocaleString('ru-RU') }}</span>
+                <span v-else class="counting"><i class="pi pi-spin pi-spinner" /> …</span>
+              </span>
               <Button
                 v-if="hasMore"
                 label="Показать ещё"
@@ -231,8 +255,15 @@ const pageSizeOptions = computed(() => {
 <style scoped>
 .center {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
   padding: 2.5rem 0;
+}
+.loading-text {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--p-text-muted-color);
 }
 .toolbar {
   display: flex;
@@ -266,5 +297,10 @@ const pageSizeOptions = computed(() => {
 .loaded {
   font-size: 0.85rem;
   color: var(--p-text-muted-color);
+}
+.counting {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 </style>
