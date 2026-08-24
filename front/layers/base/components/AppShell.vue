@@ -17,6 +17,7 @@ const sections = computed(() => {
     list.push({
       title: 'Администрирование',
       items: [
+        { label: 'Конструктор витрин', icon: 'pi pi-table', to: '/reporter/admin/views' },
         { label: 'Пользователи', icon: 'pi pi-users', to: '/reporter/admin/users' },
         { label: 'Роли', icon: 'pi pi-id-card', to: '/reporter/admin/roles' },
       ],
