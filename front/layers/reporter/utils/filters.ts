@@ -26,6 +26,12 @@ export function operatorNeedsValue(op: string): boolean {
   return op !== 'is_null' && op !== 'is_not_null'
 }
 
+// Оператор по умолчанию для inline-фильтра колонки (одно поле «Все»):
+// текст ищем по вхождению, остальные типы — по равенству.
+export function defaultOperator(displayType: string): string {
+  return displayType === 'text' ? 'contains' : 'eq'
+}
+
 export function operatorMultiValue(op: string): boolean {
   return op === 'in' || op === 'between'
 }
