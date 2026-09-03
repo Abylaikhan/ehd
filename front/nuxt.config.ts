@@ -5,6 +5,12 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-08-20',
   devtools: { enabled: true },
 
+  app: {
+    head: {
+      title: 'ЕХД БО — Единое хранилище данных бухгалтерских операций',
+    },
+  },
+
   modules: ['@primevue/nuxt-module', '@pinia/nuxt'],
 
   // Pinia-сторы живут в доменных слоях — включаем их в авто-импорт.

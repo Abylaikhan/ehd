@@ -35,7 +35,7 @@ const refreshAll = () => Promise.all([refresh(), refreshAuth(), refreshReporter(
   <div>
     <PageHeader
       title="Панель мониторинга"
-      description="Состояние компонентов локального окружения ЕХД"
+      description="Состояние компонентов локального окружения ЕХД БО"
     >
       <template #actions>
         <Button

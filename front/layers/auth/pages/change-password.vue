@@ -36,7 +36,7 @@ const submit = async () => {
 <template>
   <div class="auth-card">
     <div class="auth-brand">
-      <span class="auth-mark">ЕХД</span>
+      <span class="auth-mark">ЕХД БО</span>
       <span class="auth-brand-sub">{{ title }}</span>
     </div>
 
