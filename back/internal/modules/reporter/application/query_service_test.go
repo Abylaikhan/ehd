@@ -106,14 +106,14 @@ func TestBuildResult_StripsHiddenAndComputesNextCursor(t *testing.T) {
 		{"full_name": "B", "id": uint64(2), "secret": "s2"},
 		{"full_name": "C", "id": uint64(3), "secret": "s3"}, // лишняя (pageSize+1)
 	}
-	pm := planMeta{keysetColumn: "id", pageSize: 2, visibleOrder: []string{"full_name"}}
+	pm := planMeta{keysetColumns: []string{"id"}, pageSize: 2, visibleOrder: []string{"full_name"}}
 	res := buildResult(snap, rows, pm)
 
 	if len(res.Rows) != 2 {
 		t.Fatalf("ожидалось 2 строки (page_size), получено %d", len(res.Rows))
 	}
-	if res.NextCursor != "2" {
-		t.Errorf("next_cursor должен быть '2', получено %q", res.NextCursor)
+	if res.NextCursor != encodeCursor([]string{"2"}) {
+		t.Errorf("next_cursor должен кодировать [2], получено %q", res.NextCursor)
 	}
 	for _, r := range res.Rows {
 		if _, ok := r["secret"]; ok {

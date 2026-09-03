@@ -66,6 +66,7 @@ func (c *fakeConn) Tables(context.Context, string) ([]domain.Table, error) {
 func (c *fakeConn) Columns(context.Context, string, string) ([]domain.Column, error) {
 	return nil, nil
 }
+func (c *fakeConn) SortingKey(context.Context, string, string) ([]string, error) { return nil, nil }
 func (c *fakeConn) Query(context.Context, string, ...any) ([]map[string]any, error) {
 	return nil, nil
 }

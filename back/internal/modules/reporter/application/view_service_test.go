@@ -100,6 +100,9 @@ func (f fakeInspector) GetSource(context.Context, string) (domain.DataSource, er
 func (f fakeInspector) Columns(context.Context, string, string, string) ([]domain.Column, error) {
 	return f.cols, f.colsErr
 }
+func (f fakeInspector) SortingKey(context.Context, string, string, string) ([]string, error) {
+	return nil, nil
+}
 
 var ctx = context.Background()
 

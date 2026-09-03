@@ -32,10 +32,12 @@ type PublishedSnapshot struct {
 	RoleCodes         []string         `json:"role_codes"`
 	Columns           []SnapshotColumn `json:"columns"`
 
-	// Query Engine (slice 005).
-	KeysetColumn             string `json:"keyset_column"`
-	KeysetType               string `json:"keyset_type"` // физический тип ключа (для типа cursor-параметра)
-	KeysetDir                string `json:"keyset_dir"`
-	RowScopeRegionColumn     string `json:"row_scope_region_column,omitempty"`
-	RowScopeDepartmentColumn string `json:"row_scope_department_column,omitempty"`
+	// Query Engine (slice 005). Keyset — многоколоночный (полный сорт-ключ таблицы).
+	KeysetColumn             string   `json:"keyset_column"`  // первая колонка (совместимость/отображение)
+	KeysetType               string   `json:"keyset_type"`    // тип первой колонки (совместимость)
+	KeysetColumns            []string `json:"keyset_columns"` // колонки ключа по порядку
+	KeysetTypes              []string `json:"keyset_types"`   // их физические типы (для cursor)
+	KeysetDir                string   `json:"keyset_dir"`
+	RowScopeRegionColumn     string   `json:"row_scope_region_column,omitempty"`
+	RowScopeDepartmentColumn string   `json:"row_scope_department_column,omitempty"`
 }

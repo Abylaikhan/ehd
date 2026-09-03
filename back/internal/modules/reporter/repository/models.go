@@ -66,6 +66,7 @@ type DataViewModel struct {
 	ExportRowLimit           int       `gorm:"not null;default:100000"`
 	RowScopeMode             string    `gorm:"size:16;not null;default:by_profile"`
 	KeysetColumn             string    `gorm:"size:255"`
+	KeysetColumns            string    `gorm:"size:512"`
 	KeysetDir                string    `gorm:"size:4;not null;default:asc"`
 	RowScopeRegionColumn     string    `gorm:"size:255"`
 	RowScopeDepartmentColumn string    `gorm:"size:255"`

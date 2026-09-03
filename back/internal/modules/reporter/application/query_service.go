@@ -2,7 +2,9 @@ package application
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -178,14 +180,7 @@ func (s *QueryService) PreviewDraft(ctx context.Context, id string, spec domain.
 	if len(visible) == 0 {
 		return domain.QueryResult{}, domain.ErrQueryValidation
 	}
-	keysetType := ""
-	for _, c := range cols {
-		if c.SourceName == view.KeysetColumn {
-			keysetType = c.SourceType
-			break
-		}
-	}
-	snap := buildSnapshot(view, visible, nil, keysetType)
+	snap := buildSnapshot(view, visible, nil, typesByName(cols))
 
 	plan, pm, err := buildPlan(snap, spec, Requester{IsAdmin: true}, true)
 	if err != nil {
@@ -241,29 +236,56 @@ func (s *QueryService) resolve(ctx context.Context, req Requester, slug string) 
 
 // planMeta — вспомогательные данные для формирования ответа.
 type planMeta struct {
-	keysetColumn string
-	pageSize     int
-	visibleOrder []string
+	keysetColumns []string
+	pageSize      int
+	visibleOrder  []string
+}
+
+// keysetOf возвращает keyset-колонки snapshot (fallback на одиночную колонку).
+func keysetOf(snap domain.PublishedSnapshot) []string {
+	if len(snap.KeysetColumns) > 0 {
+		return snap.KeysetColumns
+	}
+	if snap.KeysetColumn != "" {
+		return []string{snap.KeysetColumn}
+	}
+	return nil
+}
+
+func keysetTypesOf(snap domain.PublishedSnapshot) []string {
+	if len(snap.KeysetTypes) > 0 {
+		return snap.KeysetTypes
+	}
+	if snap.KeysetType != "" {
+		return []string{snap.KeysetType}
+	}
+	return nil
 }
 
 // buildPlan валидирует QuerySpec по snapshot и строит план запроса (Принцип 3).
 func buildPlan(snap domain.PublishedSnapshot, spec domain.QuerySpec, req Requester, preview bool) (querybuilder.Plan, planMeta, error) {
-	if snap.KeysetColumn == "" {
+	keysetCols := keysetOf(snap)
+	if len(keysetCols) == 0 {
 		return querybuilder.Plan{}, planMeta{}, domain.ErrViewNotConfigured
 	}
 
 	// индекс видимых колонок snapshot
 	byName := make(map[string]domain.SnapshotColumn, len(snap.Columns))
 	visibleOrder := make([]string, 0, len(snap.Columns))
-	selectCols := make([]string, 0, len(snap.Columns)+1)
+	selectCols := make([]string, 0, len(snap.Columns)+len(keysetCols))
+	inSelect := make(map[string]struct{}, len(snap.Columns)+len(keysetCols))
 	for _, c := range snap.Columns {
 		byName[c.SourceName] = c
 		visibleOrder = append(visibleOrder, c.SourceName)
 		selectCols = append(selectCols, c.SourceName)
+		inSelect[c.SourceName] = struct{}{}
 	}
-	// keyset-колонка нужна в SELECT для чтения курсора (даже если скрыта)
-	if _, ok := byName[snap.KeysetColumn]; !ok {
-		selectCols = append(selectCols, snap.KeysetColumn)
+	// keyset-колонки нужны в SELECT для чтения курсора (даже если скрыты)
+	for _, k := range keysetCols {
+		if _, ok := inSelect[k]; !ok {
+			selectCols = append(selectCols, k)
+			inSelect[k] = struct{}{}
+		}
 	}
 
 	filters, err := validateFilters(byName, spec)
@@ -281,7 +303,7 @@ func buildPlan(snap domain.PublishedSnapshot, spec domain.QuerySpec, req Request
 	if dir == "" {
 		dir = domain.SortAsc
 	}
-	cursor, err := decodeCursor(spec.Cursor, snap.KeysetType)
+	cursor, err := decodeCursor(spec.Cursor, keysetTypesOf(snap))
 	if err != nil {
 		return querybuilder.Plan{}, planMeta{}, domain.ErrQueryValidation
 	}
@@ -295,10 +317,10 @@ func buildPlan(snap domain.PublishedSnapshot, spec domain.QuerySpec, req Request
 		Filters:    filters,
 		Search:     search,
 		RowScope:   rs,
-		Keyset:     querybuilder.Keyset{Column: snap.KeysetColumn, Dir: dir, Cursor: cursor},
+		Keyset:     querybuilder.Keyset{Columns: keysetCols, Dir: dir, Cursor: cursor},
 		Limit:      pageSize + 1, // +1 для определения следующей страницы
 	}
-	return plan, planMeta{keysetColumn: snap.KeysetColumn, pageSize: pageSize, visibleOrder: visibleOrder}, nil
+	return plan, planMeta{keysetColumns: keysetCols, pageSize: pageSize, visibleOrder: visibleOrder}, nil
 }
 
 // buildResult нарезает страницу, вычисляет next_cursor и оставляет только видимые колонки.
@@ -306,9 +328,11 @@ func buildResult(snap domain.PublishedSnapshot, rows []map[string]any, pm planMe
 	next := ""
 	if len(rows) > pm.pageSize {
 		last := rows[pm.pageSize-1]
-		if v, ok := last[pm.keysetColumn]; ok {
-			next = fmt.Sprint(v)
+		vals := make([]string, len(pm.keysetColumns))
+		for i, k := range pm.keysetColumns {
+			vals[i] = fmt.Sprint(last[k])
 		}
+		next = encodeCursor(vals)
 		rows = rows[:pm.pageSize]
 	}
 
@@ -392,8 +416,8 @@ func (s *QueryService) Export(ctx context.Context, req Requester, slug string, s
 		Filters:    filters,
 		Search:     search,
 		RowScope:   rs,
-		Keyset:     querybuilder.Keyset{Column: snap.KeysetColumn, Dir: dir}, // без cursor
-		Limit:      limit + 1,                                                // +1 — детект превышения без полного COUNT
+		Keyset:     querybuilder.Keyset{Columns: keysetOf(snap), Dir: dir}, // без cursor
+		Limit:      limit + 1,                                              // +1 — детект превышения без полного COUNT
 	}
 	sql, args, err := plan.Build()
 	if err != nil {
@@ -543,10 +567,38 @@ func clampPageSize(n, min, def, max int) int {
 	return n
 }
 
-func decodeCursor(cursor, keysetType string) (any, error) {
+// encodeCursor кодирует значения keyset-ключа последней строки в непрозрачный курсор
+// (base64 от JSON-массива строк).
+func encodeCursor(vals []string) string {
+	b, _ := json.Marshal(vals)
+	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+// decodeCursor раскодирует курсор в типизированный кортеж значений keyset-ключа.
+// Пустой курсор (первая страница) → nil.
+func decodeCursor(cursor string, keysetTypes []string) ([]any, error) {
 	if cursor == "" {
 		return nil, nil
 	}
+	raw, err := base64.RawURLEncoding.DecodeString(cursor)
+	if err != nil {
+		return nil, err
+	}
+	var strs []string
+	if err := json.Unmarshal(raw, &strs); err != nil {
+		return nil, err
+	}
+	if len(strs) != len(keysetTypes) {
+		return nil, errBadCursor
+	}
+	out := make([]any, len(strs))
+	for i, s := range strs {
+		out[i] = coerceCursorValue(s, keysetTypes[i])
+	}
+	return out, nil
+}
+
+func coerceCursorValue(s, keysetType string) any {
 	base := keysetType
 	if i := strings.IndexByte(base, '('); i >= 0 {
 		base = base[:i]
@@ -554,10 +606,15 @@ func decodeCursor(cursor, keysetType string) (any, error) {
 	base = strings.TrimPrefix(base, "Nullable(")
 	switch {
 	case strings.HasPrefix(base, "UInt"):
-		return strconv.ParseUint(cursor, 10, 64)
+		if v, err := strconv.ParseUint(s, 10, 64); err == nil {
+			return v
+		}
 	case strings.HasPrefix(base, "Int"):
-		return strconv.ParseInt(cursor, 10, 64)
-	default:
-		return cursor, nil
+		if v, err := strconv.ParseInt(s, 10, 64); err == nil {
+			return v
+		}
 	}
+	return s
 }
+
+var errBadCursor = errors.New("некорректный курсор")

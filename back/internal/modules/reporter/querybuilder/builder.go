@@ -19,11 +19,11 @@ type RowScope struct {
 	Departments      []string
 }
 
-// Keyset — стабильный ключ для cursor-пагинации.
+// Keyset — стабильный ключ для cursor-пагинации (многоколоночный: полный сорт-ключ таблицы).
 type Keyset struct {
-	Column string
-	Dir    string // asc|desc
-	Cursor any    // nil на первой странице
+	Columns []string
+	Dir     string // asc|desc (общее направление всех колонок ключа)
+	Cursor  []any  // значения ключа последней строки прошлой страницы; nil/пусто на первой
 }
 
 // Plan — полностью проверенный план запроса (колонки уже из whitelist).
@@ -114,17 +114,23 @@ func (p Plan) Build() (string, []any, error) {
 		return "", nil, err
 	}
 
-	// keyset-предикат
-	if p.Keyset.Column != "" && p.Keyset.Cursor != nil {
-		if !SafeIdent(p.Keyset.Column) {
-			return "", nil, ErrUnsafeIdentifier
+	// keyset-предикат кортежем: (c1, c2, …) OP (?, ?, …)
+	if len(p.Keyset.Columns) > 0 && len(p.Keyset.Cursor) == len(p.Keyset.Columns) {
+		quoted := make([]string, len(p.Keyset.Columns))
+		ph := make([]string, len(p.Keyset.Columns))
+		for i, c := range p.Keyset.Columns {
+			if !SafeIdent(c) {
+				return "", nil, ErrUnsafeIdentifier
+			}
+			quoted[i] = quoteIdent(c)
+			ph[i] = "?"
+			args = append(args, p.Keyset.Cursor[i])
 		}
 		op := ">"
 		if p.Keyset.Dir == "desc" {
 			op = "<"
 		}
-		conds = append(conds, quoteIdent(p.Keyset.Column)+" "+op+" ?")
-		args = append(args, p.Keyset.Cursor)
+		conds = append(conds, "("+strings.Join(quoted, ", ")+") "+op+" ("+strings.Join(ph, ", ")+")")
 	}
 
 	var sb strings.Builder
@@ -136,18 +142,20 @@ func (p Plan) Build() (string, []any, error) {
 		sb.WriteString(" WHERE ")
 		sb.WriteString(strings.Join(conds, " AND "))
 	}
-	if p.Keyset.Column != "" {
-		if !SafeIdent(p.Keyset.Column) {
-			return "", nil, ErrUnsafeIdentifier
-		}
+	if len(p.Keyset.Columns) > 0 {
 		dir := "ASC"
 		if p.Keyset.Dir == "desc" {
 			dir = "DESC"
 		}
+		obs := make([]string, len(p.Keyset.Columns))
+		for i, c := range p.Keyset.Columns {
+			if !SafeIdent(c) {
+				return "", nil, ErrUnsafeIdentifier
+			}
+			obs[i] = quoteIdent(c) + " " + dir
+		}
 		sb.WriteString(" ORDER BY ")
-		sb.WriteString(quoteIdent(p.Keyset.Column))
-		sb.WriteString(" ")
-		sb.WriteString(dir)
+		sb.WriteString(strings.Join(obs, ", "))
 	}
 	sb.WriteString(" LIMIT ")
 	sb.WriteString(strconv.Itoa(p.Limit))

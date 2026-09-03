@@ -37,6 +37,7 @@ type ViewRepo interface {
 type SourceInspector interface {
 	GetSource(ctx context.Context, id string) (domain.DataSource, error)
 	Columns(ctx context.Context, id, db, table string) ([]domain.Column, error)
+	SortingKey(ctx context.Context, id, db, table string) ([]string, error)
 }
 
 // ViewService — сценарии управления представлениями.
@@ -101,11 +102,7 @@ func (s *ViewService) CreateView(ctx context.Context, in CreateViewInput) (domai
 	}
 
 	viewCols := make([]domain.ViewColumn, len(cols))
-	keyset := cols[0].Name // стабильный ключ по умолчанию — первичный ключ таблицы, иначе первая колонка
 	for i, c := range cols {
-		if c.InPrimaryKey && keyset == cols[0].Name {
-			keyset = c.Name
-		}
 		viewCols[i] = domain.ViewColumn{
 			SourceName:  c.Name,
 			SourceType:  c.Type,
@@ -117,13 +114,7 @@ func (s *ViewService) CreateView(ctx context.Context, in CreateViewInput) (domai
 			Format:      "{}",
 		}
 	}
-	// первый первичный ключ приоритетнее (перебираем явно)
-	for _, c := range cols {
-		if c.InPrimaryKey {
-			keyset = c.Name
-			break
-		}
-	}
+	keysetCols := s.resolveKeyset(ctx, in.DataSourceID, in.Database, in.Table, cols)
 
 	view := domain.DataView{
 		Name:            in.Name,
@@ -137,10 +128,48 @@ func (s *ViewService) CreateView(ctx context.Context, in CreateViewInput) (domai
 		PageSizeMax:     domain.MaxPageSize,
 		ExportRowLimit:  domain.MaxExportRows,
 		RowScopeMode:    domain.RowScopeByProfile,
-		KeysetColumn:    keyset,
+		KeysetColumn:    firstOrEmpty(keysetCols),
+		KeysetColumns:   strings.Join(keysetCols, ","),
 		KeysetDir:       domain.SortAsc,
 	}
 	return s.repo.CreateView(ctx, view, viewCols)
+}
+
+// resolveKeyset определяет keyset-колонки: сорт-ключ таблицы, пересечённый с реальными
+// колонками (валидный префикс); при неудаче — первичный ключ или первая колонка.
+func (s *ViewService) resolveKeyset(ctx context.Context, sourceID, db, table string, cols []domain.Column) []string {
+	names := make(map[string]struct{}, len(cols))
+	for _, c := range cols {
+		names[c.Name] = struct{}{}
+	}
+	if key, err := s.sources.SortingKey(ctx, sourceID, db, table); err == nil {
+		valid := make([]string, 0, len(key))
+		for _, k := range key {
+			if _, ok := names[k]; !ok {
+				break
+			}
+			valid = append(valid, k)
+		}
+		if len(valid) > 0 {
+			return valid
+		}
+	}
+	for _, c := range cols {
+		if c.InPrimaryKey {
+			return []string{c.Name}
+		}
+	}
+	if len(cols) > 0 {
+		return []string{cols[0].Name}
+	}
+	return nil
+}
+
+func firstOrEmpty(s []string) string {
+	if len(s) > 0 {
+		return s[0]
+	}
+	return ""
 }
 
 // GetView возвращает представление с колонками и правами.
@@ -401,14 +430,7 @@ func (s *ViewService) Publish(ctx context.Context, id string) (domain.DataView, 
 		return domain.DataView{}, domain.ErrPublishValidation
 	}
 
-	keysetType := ""
-	for _, c := range cols {
-		if c.SourceName == v.KeysetColumn {
-			keysetType = c.SourceType
-			break
-		}
-	}
-	snap := buildSnapshot(v, visible, roles, keysetType)
+	snap := buildSnapshot(v, visible, roles, typesByName(cols))
 	snap.SchemaHash = schemaHash(snap.Columns)
 	payload, err := json.Marshal(snap)
 	if err != nil {
@@ -480,7 +502,30 @@ func visibleColumns(cols []domain.ViewColumn) []domain.ViewColumn {
 	return out
 }
 
-func buildSnapshot(v domain.DataView, visible []domain.ViewColumn, roles []string, keysetType string) domain.PublishedSnapshot {
+// typesByName — карта source_name → source_type по всем колонкам (для типов keyset).
+func typesByName(cols []domain.ViewColumn) map[string]string {
+	m := make(map[string]string, len(cols))
+	for _, c := range cols {
+		m[c.SourceName] = c.SourceType
+	}
+	return m
+}
+
+func splitCSV(s string) []string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func buildSnapshot(v domain.DataView, visible []domain.ViewColumn, roles []string, typeByName map[string]string) domain.PublishedSnapshot {
 	cols := make([]domain.SnapshotColumn, len(visible))
 	for i, c := range visible {
 		cols[i] = domain.SnapshotColumn{
@@ -502,6 +547,14 @@ func buildSnapshot(v domain.DataView, visible []domain.ViewColumn, roles []strin
 	if dir == "" {
 		dir = domain.SortAsc
 	}
+	keysetCols := splitCSV(v.KeysetColumns)
+	if len(keysetCols) == 0 && v.KeysetColumn != "" {
+		keysetCols = []string{v.KeysetColumn}
+	}
+	keysetTypes := make([]string, len(keysetCols))
+	for i, k := range keysetCols {
+		keysetTypes[i] = typeByName[k]
+	}
 	return domain.PublishedSnapshot{
 		DatabaseName:             v.DatabaseName,
 		TableName:                v.TableName,
@@ -515,7 +568,9 @@ func buildSnapshot(v domain.DataView, visible []domain.ViewColumn, roles []strin
 		RoleCodes:                roles,
 		Columns:                  cols,
 		KeysetColumn:             v.KeysetColumn,
-		KeysetType:               keysetType,
+		KeysetType:               typeByName[v.KeysetColumn],
+		KeysetColumns:            keysetCols,
+		KeysetTypes:              keysetTypes,
 		KeysetDir:                dir,
 		RowScopeRegionColumn:     v.RowScopeRegionColumn,
 		RowScopeDepartmentColumn: v.RowScopeDepartmentColumn,
