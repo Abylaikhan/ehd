@@ -12,7 +12,7 @@ func basePlan() Plan {
 		Database:   "ehd_src",
 		Table:      "demo",
 		SelectCols: []string{"id", "full_name"},
-		Keyset:     Keyset{Column: "id", Dir: "asc"},
+		Keyset:     Keyset{Columns: []string{"id"}, Dir: "asc"},
 		Limit:      51,
 	}
 }
@@ -62,14 +62,14 @@ func TestBuild_UnsafeIdentifierRejected(t *testing.T) {
 
 func TestBuild_KeysetPredicateAscDesc(t *testing.T) {
 	p := basePlan()
-	p.Keyset.Cursor = uint64(100)
+	p.Keyset.Cursor = []any{uint64(100)}
 	sql, _, _ := p.Build()
-	if !strings.Contains(sql, "`id` > ?") {
+	if !strings.Contains(sql, "(`id`) > (?)") {
 		t.Errorf("нет keyset-предиката ASC: %s", sql)
 	}
 	p.Keyset.Dir = "desc"
 	sql, _, _ = p.Build()
-	if !strings.Contains(sql, "`id` < ?") || !strings.Contains(sql, "ORDER BY `id` DESC") {
+	if !strings.Contains(sql, "(`id`) < (?)") || !strings.Contains(sql, "ORDER BY `id` DESC") {
 		t.Errorf("keyset DESC неверен: %s", sql)
 	}
 }

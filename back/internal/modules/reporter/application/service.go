@@ -43,6 +43,7 @@ type SourceConn interface {
 	Databases(ctx context.Context) ([]string, error)
 	Tables(ctx context.Context, db string) ([]domain.Table, error)
 	Columns(ctx context.Context, db, table string) ([]domain.Column, error)
+	SortingKey(ctx context.Context, db, table string) ([]string, error)
 	Query(ctx context.Context, sql string, args ...any) ([]map[string]any, error)
 	ScalarUint64(ctx context.Context, sql string, args ...any) (uint64, error)
 	Close() error
@@ -263,6 +264,21 @@ func (s *Service) Columns(ctx context.Context, id, db, table string) ([]domain.C
 		return nil, domain.ErrConnectionFailed
 	}
 	return cols, nil
+}
+
+// SortingKey возвращает колонки сортировочного ключа таблицы (для keyset-пагинации).
+func (s *Service) SortingKey(ctx context.Context, id, db, table string) ([]string, error) {
+	conn, err := s.open(ctx, id, db)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	key, err := conn.SortingKey(ctx, db, table)
+	if err != nil {
+		return nil, domain.ErrConnectionFailed
+	}
+	return key, nil
 }
 
 // RunQuery выполняет проверенный SELECT на подключении к источнику (для Query Engine).

@@ -64,7 +64,8 @@ type DataView struct {
 	RowScopeMode      string
 
 	// Конфигурация Query Engine (slice 005).
-	KeysetColumn             string // стабильный ключ для keyset-пагинации (обычно первичный ключ)
+	KeysetColumn             string // первая колонка ключа (для отображения/совместимости)
+	KeysetColumns            string // полный сорт-ключ таблицы через запятую (keyset-пагинация)
 	KeysetDir                string // asc|desc
 	RowScopeRegionColumn     string // физическая колонка для RLS по региону
 	RowScopeDepartmentColumn string // физическая колонка для RLS по подразделению

@@ -78,6 +78,10 @@ func (c *sourceConn) Columns(ctx context.Context, db, table string) ([]domain.Co
 	return out, nil
 }
 
+func (c *sourceConn) SortingKey(ctx context.Context, db, table string) ([]string, error) {
+	return clickhouse.SortingKey(ctx, c.db, db, table)
+}
+
 // Query выполняет параметризованный SELECT и возвращает строки map[колонка]значение.
 // Скан динамический по ScanType драйвера (clickhouse-go не поддерживает *interface{}).
 func (c *sourceConn) Query(ctx context.Context, query string, args ...any) ([]map[string]any, error) {

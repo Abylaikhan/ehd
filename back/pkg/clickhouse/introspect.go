@@ -3,8 +3,32 @@ package clickhouse
 import (
 	"context"
 	"database/sql"
+	"regexp"
 	"strings"
 )
+
+var identOnly = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// SortingKey возвращает ведущие колонки сортировочного ключа таблицы (для keyset-пагинации).
+// Берётся префикс из простых идентификаторов; выражение в ключе (напр. toYYYYMM(dt))
+// останавливает разбор — используется валидный префикс.
+func SortingKey(ctx context.Context, db *sql.DB, database, table string) ([]string, error) {
+	var key string
+	err := db.QueryRowContext(ctx,
+		"SELECT sorting_key FROM system.tables WHERE database = ? AND name = ?", database, table).Scan(&key)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0)
+	for _, p := range strings.Split(key, ",") {
+		p = strings.TrimSpace(p)
+		if !identOnly.MatchString(p) {
+			break
+		}
+		out = append(out, p)
+	}
+	return out, nil
+}
 
 // TableInfo — строка интроспекции таблиц (system.tables).
 type TableInfo struct {
