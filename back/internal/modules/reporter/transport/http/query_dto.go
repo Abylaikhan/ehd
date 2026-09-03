@@ -26,7 +26,8 @@ type querySpecReq struct {
 }
 
 type sortReq struct {
-	Dir string `json:"dir"`
+	Column string `json:"column"`
+	Dir    string `json:"dir"`
 }
 
 func (q querySpecReq) toDomain() domain.QuerySpec {
@@ -35,11 +36,12 @@ func (q querySpecReq) toDomain() domain.QuerySpec {
 		filters[i] = domain.Filter{Column: f.Column, Operator: f.Operator, Value: f.Value, Values: f.Values}
 	}
 	return domain.QuerySpec{
-		Filters:  filters,
-		Search:   q.Search,
-		SortDir:  q.Sort.Dir,
-		PageSize: q.PageSize,
-		Cursor:   q.Cursor,
+		Filters:    filters,
+		Search:     q.Search,
+		SortColumn: q.Sort.Column,
+		SortDir:    q.Sort.Dir,
+		PageSize:   q.PageSize,
+		Cursor:     q.Cursor,
 	}
 }
 

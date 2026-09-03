@@ -90,6 +90,31 @@ func TestBuildPlan_KeysetHiddenColumnAddedToSelect(t *testing.T) {
 	}
 }
 
+func TestBuildPlan_SortByColumn(t *testing.T) {
+	snap := snapWith([]domain.SnapshotColumn{
+		{SourceName: "id", SourceType: "UInt64", DisplayType: domain.DisplayNumber},
+		{SourceName: "name", SourceType: "String", DisplayType: domain.DisplayText, Sortable: true},
+	})
+	// сортировка по sortable-колонке → она первой, keyset id — тай-брейкером
+	plan, _, err := buildPlan(snap, domain.QuerySpec{SortColumn: "name", SortDir: "desc"}, Requester{IsAdmin: true}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Keyset.Columns) < 2 || plan.Keyset.Columns[0] != "name" || plan.Keyset.Columns[1] != "id" {
+		t.Errorf("порядок должен быть [name, id]: %v", plan.Keyset.Columns)
+	}
+	if plan.Keyset.Dir != "desc" {
+		t.Errorf("направление сортировки: %q", plan.Keyset.Dir)
+	}
+	// сортировка по не-sortable / неизвестной колонке → ошибка (fail-closed)
+	if _, _, err := buildPlan(snap, domain.QuerySpec{SortColumn: "id"}, Requester{IsAdmin: true}, false); err != domain.ErrQueryValidation {
+		t.Fatalf("не-sortable → ожидалась ErrQueryValidation, получено %v", err)
+	}
+	if _, _, err := buildPlan(snap, domain.QuerySpec{SortColumn: "nope"}, Requester{IsAdmin: true}, false); err != domain.ErrQueryValidation {
+		t.Fatalf("неизвестная колонка → ожидалась ErrQueryValidation, получено %v", err)
+	}
+}
+
 func TestClampPageSize(t *testing.T) {
 	cases := []struct{ in, want int }{{0, 50}, {5, 20}, {50, 50}, {500, 200}, {150, 150}}
 	for _, c := range cases {
