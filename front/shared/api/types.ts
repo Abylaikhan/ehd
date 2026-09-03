@@ -197,8 +197,26 @@ export interface DataSourceSummary {
   host: string
   port: number
   protocol: string
+  tls_enabled: boolean
+  tls_skip_verify: boolean
   username: string
   status: string
+  created_at: string
+  updated_at: string
+}
+
+// Тело создания/обновления источника. Пароль — только на вход; при обновлении
+// пустой пароль оставляет секрет без изменений (backend REP-FR-013).
+export interface DataSourcePayload {
+  code: string
+  name: string
+  host: string
+  port: number
+  protocol: string
+  tls_enabled: boolean
+  tls_skip_verify: boolean
+  username: string
+  password?: string
 }
 
 export interface IntrospectDatabase {
