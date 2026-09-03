@@ -208,7 +208,7 @@ async function doPreview() {
             <Column header="Порядок" style="width: 6rem">
               <template #body="{ data: c }"><InputNumber v-model="c.position" :min="0" :useGrouping="false" class="cell-num" /></template>
             </Column>
-            <Column>
+            <Column body-class="flag-cell">
               <template #header>
                 <div class="flag-head">
                   <span>Видима</span>
@@ -218,7 +218,7 @@ async function doPreview() {
               </template>
               <template #body="{ data: c }"><Checkbox v-model="c.visible" :binary="true" /></template>
             </Column>
-            <Column>
+            <Column body-class="flag-cell">
               <template #header>
                 <div class="flag-head">
                   <span>Поиск</span>
@@ -228,7 +228,7 @@ async function doPreview() {
               </template>
               <template #body="{ data: c }"><Checkbox v-model="c.searchable" :binary="true" /></template>
             </Column>
-            <Column>
+            <Column body-class="flag-cell">
               <template #header>
                 <div class="flag-head">
                   <span>Фильтр</span>
@@ -238,7 +238,7 @@ async function doPreview() {
               </template>
               <template #body="{ data: c }"><Checkbox v-model="c.filterable" :binary="true" /></template>
             </Column>
-            <Column>
+            <Column body-class="flag-cell">
               <template #header>
                 <div class="flag-head">
                   <span>Сортировка</span>
@@ -248,7 +248,7 @@ async function doPreview() {
               </template>
               <template #body="{ data: c }"><Checkbox v-model="c.sortable" :binary="true" /></template>
             </Column>
-            <Column>
+            <Column body-class="flag-cell">
               <template #header>
                 <div class="flag-head">
                   <span>Экспорт</span>
@@ -367,6 +367,8 @@ async function doPreview() {
 .source-row .k { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ehd-muted); }
 .source-row .v { font-weight: 600; }
 .flag-head { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; white-space: nowrap; }
+/* Флаг-чекбоксы по центру ячейки — под центрированным заголовком «отметить все». */
+:deep(.flag-cell) { text-align: center; }
 .cell-input { width: 100%; }
 .cell-num :deep(.p-inputtext) { width: 5rem; }
 .muted { color: var(--p-text-muted-color); font-size: 0.85rem; }
