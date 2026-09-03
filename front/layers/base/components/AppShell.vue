@@ -52,6 +52,7 @@ const sections = computed(() => {
     list.push({
       title: 'Администрирование',
       items: [
+        { label: 'Источники данных', icon: 'pi pi-database', to: '/reporter/admin/sources' },
         { label: 'Конструктор витрин', icon: 'pi pi-table', to: '/reporter/admin/views' },
         { label: 'Навигация', icon: 'pi pi-sitemap', to: '/reporter/admin/menu' },
         { label: 'Пользователи', icon: 'pi pi-users', to: '/reporter/admin/users' },

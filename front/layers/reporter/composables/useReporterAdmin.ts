@@ -1,6 +1,7 @@
 import type {
   ItemsResponse,
   DataSourceSummary,
+  DataSourcePayload,
   IntrospectDatabase,
   IntrospectTable,
   IntrospectColumn,
@@ -24,6 +25,18 @@ export function useReporterAdmin() {
 
   const sources = {
     list: () => api<ItemsResponse<DataSourceSummary>>(`${base}/sources`),
+    get: (id: string) => api<DataSourceSummary>(`${base}/sources/${enc(id)}`),
+    create: (payload: DataSourcePayload) =>
+      api<DataSourceSummary>(`${base}/sources`, { method: 'POST', body: payload }),
+    update: (id: string, payload: DataSourcePayload) =>
+      api<DataSourceSummary>(`${base}/sources/${enc(id)}`, { method: 'PATCH', body: payload }),
+    // Проверка связи без сохранения (по параметрам формы) и по сохранённому источнику.
+    testParams: (payload: DataSourcePayload) =>
+      api<{ ok: boolean }>(`${base}/sources/test`, { method: 'POST', body: payload }),
+    test: (id: string) => api<{ ok: boolean }>(`${base}/sources/${enc(id)}/test`, { method: 'POST' }),
+    activate: (id: string) => api<{ status: string }>(`${base}/sources/${enc(id)}/activate`, { method: 'POST' }),
+    deactivate: (id: string) =>
+      api<{ status: string }>(`${base}/sources/${enc(id)}/deactivate`, { method: 'POST' }),
     databases: (id: string) => api<ItemsResponse<IntrospectDatabase>>(`${base}/sources/${enc(id)}/databases`),
     tables: (id: string, db: string) =>
       api<ItemsResponse<IntrospectTable>>(`${base}/sources/${enc(id)}/databases/${enc(db)}/tables`),
