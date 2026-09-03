@@ -122,7 +122,11 @@ async function create() {
                 option-value="name"
                 :loading="loadingTbl"
                 :disabled="!database"
+                filter
+                filter-placeholder="Поиск таблицы..."
+                :reset-filter-on-hide="true"
                 placeholder="Выберите таблицу/VIEW"
+                :virtual-scroller-options="{ itemSize: 38 }"
               />
             </div>
           </div>

@@ -30,7 +30,7 @@ const isActive = (to: string) => (to === '/' ? route.path === '/' : route.path.s
 
 const pageTitle = computed(() => {
   for (const s of sections.value) for (const i of s.items) if (isActive(i.to)) return i.label
-  return 'ЕХД'
+  return 'ЕХД БО'
 })
 
 const userMenu = ref()
@@ -61,8 +61,8 @@ const toggleUserMenu = (e: Event) => userMenu.value.toggle(e)
   <div class="shell" :class="{ collapsed }">
     <aside class="sidebar">
       <div class="brand">
-        <span class="brand-mark">ЕХД</span>
-        <span v-if="!collapsed" class="brand-sub">Единое хранилище данных</span>
+        <span class="brand-mark">ЕХД БО</span>
+        <span v-if="!collapsed" class="brand-sub">Единое хранилище данных бухгалтерских операций</span>
       </div>
 
       <nav class="nav">

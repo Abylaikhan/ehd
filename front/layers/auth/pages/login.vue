@@ -86,8 +86,8 @@ const edsStubSubmit = async () => {
 <template>
   <div class="auth-card">
     <div class="auth-brand">
-      <span class="auth-mark">ЕХД</span>
-      <span class="auth-brand-sub">Единое хранилище данных</span>
+      <span class="auth-mark">ЕХД БО</span>
+      <span class="auth-brand-sub">Единое хранилище данных бухгалтерских операций</span>
     </div>
 
     <form class="auth-body" @submit.prevent="submit">
