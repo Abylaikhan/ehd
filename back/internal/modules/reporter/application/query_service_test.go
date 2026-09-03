@@ -115,6 +115,46 @@ func TestBuildPlan_SortByColumn(t *testing.T) {
 	}
 }
 
+func TestBuildPlan_DefaultSortApplied(t *testing.T) {
+	snap := snapWith([]domain.SnapshotColumn{
+		{SourceName: "id", SourceType: "UInt64", DisplayType: domain.DisplayNumber},
+		{SourceName: "created_at", SourceType: "DateTime", DisplayType: domain.DisplayNumber, Sortable: true},
+	})
+	snap.DefaultSortColumn = "created_at"
+	snap.DefaultSortDir = domain.SortDesc
+
+	// нет пользовательской сортировки → применяется дефолт витрины (created_at ↓), keyset id — тай-брейкер
+	plan, _, err := buildPlan(snap, domain.QuerySpec{}, Requester{IsAdmin: true}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Keyset.Columns) < 2 || plan.Keyset.Columns[0] != "created_at" || plan.Keyset.Columns[1] != "id" {
+		t.Errorf("дефолтный порядок должен быть [created_at, id]: %v", plan.Keyset.Columns)
+	}
+	if plan.Keyset.Dir != domain.SortDesc {
+		t.Errorf("дефолтное направление должно быть desc: %q", plan.Keyset.Dir)
+	}
+
+	// явная пользовательская сортировка перекрывает дефолт витрины
+	planU, _, err := buildPlan(snap, domain.QuerySpec{SortColumn: "created_at", SortDir: domain.SortAsc}, Requester{IsAdmin: true}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if planU.Keyset.Dir != domain.SortAsc {
+		t.Errorf("пользовательский dir должен перекрыть дефолт: %q", planU.Keyset.Dir)
+	}
+
+	// некорректный дефолт (не-sortable колонка) молча игнорируется → порядок по keyset, без ошибки
+	snap.DefaultSortColumn = "id"
+	planF, _, err := buildPlan(snap, domain.QuerySpec{}, Requester{IsAdmin: true}, false)
+	if err != nil {
+		t.Fatalf("некорректный дефолт не должен давать ошибку всем запросам: %v", err)
+	}
+	if len(planF.Keyset.Columns) == 0 || planF.Keyset.Columns[0] != "id" {
+		t.Errorf("при игнорировании дефолта порядок = keyset [id]: %v", planF.Keyset.Columns)
+	}
+}
+
 func TestClampPageSize(t *testing.T) {
 	cases := []struct{ in, want int }{{0, 50}, {5, 20}, {50, 50}, {500, 200}, {150, 150}}
 	for _, c := range cases {
