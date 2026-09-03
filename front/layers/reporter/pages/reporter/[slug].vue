@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import type { QuerySpec } from '~~/shared/api/types'
+import type { QuerySpec, FilterSpec } from '~~/shared/api/types'
 import { formatCell } from '../../utils/format'
+import { buildFilterSpec, operatorNeedsValue, operatorLabel, filterLabel } from '../../utils/filters'
 
 // Пользовательская таблица витрины (REP-FR-050..055).
 definePageMeta({ middleware: 'auth' })
@@ -15,6 +16,8 @@ const slug = computed(() => String(route.params.slug))
 const searchInput = ref(typeof route.query.q === 'string' ? route.query.q : '')
 const search = ref(searchInput.value)
 const pageSize = ref(route.query.page_size ? Number(route.query.page_size) : 0)
+const activeFilters = ref<FilterSpec[]>([])
+const sort = ref<{ column: string; dir: 'asc' | 'desc' } | null>(null)
 
 // --- метаданные ---
 const {
@@ -26,18 +29,27 @@ const {
 const effectivePageSize = computed(() => pageSize.value || meta.value?.page_size_default || 50)
 
 function currentSpec(cursor?: string): QuerySpec {
-  return { search: search.value || undefined, page_size: effectivePageSize.value, cursor }
+  return {
+    search: search.value || undefined,
+    page_size: effectivePageSize.value,
+    cursor,
+    filters: activeFilters.value.length ? activeFilters.value : undefined,
+    sort: sort.value ? { column: sort.value.column, dir: sort.value.dir } : undefined,
+  }
 }
 
-// Данные и total_count грузятся на КЛИЕНТЕ (server:false) и параллельно: на больших таблицах
-// запрос/COUNT долгие — не блокируем SSR, показываем лоадер, каркас (meta) отрендерен на сервере.
+// ключи-триггеры перезагрузки (поиск/размер/фильтры/сортировка)
+const filtersKey = computed(() => JSON.stringify(activeFilters.value))
+const sortKey = computed(() => JSON.stringify(sort.value))
+
+// Данные и total_count грузятся на КЛИЕНТЕ (server:false) и параллельно.
 const {
   data: queryData,
   pending: dataPending,
   error: dataError,
   refresh: refreshData,
 } = useLazyAsyncData(`view-data-${slug.value}`, () => views.query(slug.value, currentSpec()), {
-  watch: [search, effectivePageSize],
+  watch: [search, effectivePageSize, filtersKey, sortKey],
   server: false,
 })
 
@@ -46,7 +58,7 @@ const {
   pending: countPending,
   refresh: refreshCount,
 } = useLazyAsyncData(`view-count-${slug.value}`, () => views.count(slug.value, currentSpec()), {
-  watch: [search, effectivePageSize],
+  watch: [search, effectivePageSize, filtersKey],
   server: false,
 })
 
@@ -91,6 +103,48 @@ function applySearch() {
   search.value = searchInput.value.trim()
 }
 
+// --- сортировка по колонке (клик по заголовку) ---
+function sortableFor(name: string): boolean {
+  return (meta.value?.columns ?? []).some((c) => c.source_name === name && c.sortable)
+}
+function onSort(e: { sortField?: string | null; sortOrder?: number | null }) {
+  if (e.sortField && e.sortOrder) {
+    sort.value = { column: String(e.sortField), dir: e.sortOrder === 1 ? 'asc' : 'desc' }
+  } else {
+    sort.value = null
+  }
+}
+
+// --- фильтры ---
+const filterCols = computed(() => (meta.value?.columns ?? []).filter((c) => c.filterable))
+const draft = reactive({ column: '', operator: '', value: '' })
+const draftOperators = computed(() => {
+  const col = filterCols.value.find((c) => c.source_name === draft.column)
+  return (col?.operators ?? []).map((op) => ({ label: operatorLabel(op), value: op }))
+})
+const draftNeedsValue = computed(() => draft.operator !== '' && operatorNeedsValue(draft.operator))
+watch(
+  () => draft.column,
+  () => {
+    draft.operator = ''
+    draft.value = ''
+  },
+)
+function labelOf(colName: string): string {
+  return (meta.value?.columns ?? []).find((c) => c.source_name === colName)?.label ?? colName
+}
+function addFilter() {
+  const spec = buildFilterSpec(draft.column, draft.operator, draft.value)
+  if (!spec) return
+  activeFilters.value = [...activeFilters.value, spec]
+  draft.column = ''
+  draft.operator = ''
+  draft.value = ''
+}
+function removeFilter(i: number) {
+  activeFilters.value = activeFilters.value.filter((_, idx) => idx !== i)
+}
+
 // --- экспорт ---
 const exporting = ref(false)
 const actionError = ref('')
@@ -98,7 +152,10 @@ async function doExport() {
   exporting.value = true
   actionError.value = ''
   try {
-    await views.exportView(slug.value, { search: search.value || undefined })
+    await views.exportView(slug.value, {
+      search: search.value || undefined,
+      filters: activeFilters.value.length ? activeFilters.value : undefined,
+    })
   } catch (e) {
     actionError.value = apiErrorMessage(e)
   } finally {
@@ -129,14 +186,12 @@ const screenState = computed(() => {
       return 'source'
   }
   if (metaError.value || dataError.value) return 'error'
-  if (!queryData.value) return 'loading' // первая порция ещё грузится (клиентский fetch)
+  if (!queryData.value) return 'loading'
   if (rows.value.length === 0) return 'empty'
   return 'ready'
 })
 
-// таблица показывает оверлей-лоадер при любой подгрузке (первичной, поиске, смене размера)
 const tableLoading = computed(() => dataPending.value || loadingMore.value)
-// count готов только когда реально загружен (иначе показываем «…», не «0»)
 const countReady = computed(() => !countPending.value && countData.value != null)
 
 const pageSizeOptions = computed(() => {
@@ -155,77 +210,68 @@ const pageSizeOptions = computed(() => {
           <ProgressSpinner style="width: 2.5rem; height: 2.5rem" />
           <p class="loading-text">Загрузка данных…</p>
         </div>
-        <ErrorState
-          v-else-if="screenState === 'denied'"
-          title="Доступ запрещён"
-          message="У вас нет прав на просмотр этой витрины."
-        />
-        <ErrorState
-          v-else-if="screenState === 'notfound'"
-          title="Витрина не найдена"
-          message="Представление не существует или снято с публикации."
-        />
-        <ErrorState
-          v-else-if="screenState === 'source'"
-          title="Источник недоступен"
-          message="Источник данных временно недоступен. Повторите позже."
-          retryable
-          @retry="reload"
-        />
-        <ErrorState
-          v-else-if="screenState === 'error'"
-          message="Не удалось загрузить данные витрины."
-          retryable
-          @retry="reload"
-        />
+        <ErrorState v-else-if="screenState === 'denied'" title="Доступ запрещён" message="У вас нет прав на просмотр этой витрины." />
+        <ErrorState v-else-if="screenState === 'notfound'" title="Витрина не найдена" message="Представление не существует или снято с публикации." />
+        <ErrorState v-else-if="screenState === 'source'" title="Источник недоступен" message="Источник данных временно недоступен. Повторите позже." retryable @retry="reload" />
+        <ErrorState v-else-if="screenState === 'error'" message="Не удалось загрузить данные витрины." retryable @retry="reload" />
 
         <template v-else>
           <div class="toolbar">
             <IconField iconPosition="left" class="search">
               <InputIcon class="pi pi-search" />
-              <InputText
-                v-model="searchInput"
-                placeholder="Поиск..."
-                @keyup.enter="applySearch"
-                @blur="applySearch"
-              />
+              <InputText v-model="searchInput" placeholder="Поиск..." @keyup.enter="applySearch" @blur="applySearch" />
             </IconField>
             <div class="toolbar-right">
-              <Select
-                v-model="pageSize"
-                :options="pageSizeOptions"
-                placeholder="Размер страницы"
-                aria-label="Размер страницы"
-              />
-              <Button
-                label="Экспорт"
-                icon="pi pi-download"
-                :loading="exporting"
-                :disabled="rows.length === 0"
-                @click="doExport"
+              <Select v-model="pageSize" :options="pageSizeOptions" placeholder="Размер страницы" aria-label="Размер страницы" />
+              <Button label="Экспорт" icon="pi pi-download" :loading="exporting" :disabled="rows.length === 0" @click="doExport" />
+            </div>
+          </div>
+
+          <!-- Конструктор фильтров -->
+          <div v-if="filterCols.length" class="filters">
+            <div class="filter-builder">
+              <Select v-model="draft.column" :options="filterCols" option-label="label" option-value="source_name" placeholder="Колонка" class="fb-col" />
+              <Select v-model="draft.operator" :options="draftOperators" option-label="label" option-value="value" placeholder="Условие" :disabled="!draft.column" class="fb-op" />
+              <InputText v-if="draftNeedsValue" v-model="draft.value" placeholder="Значение" class="fb-val" @keyup.enter="addFilter" />
+              <Button label="Добавить фильтр" icon="pi pi-plus" outlined size="small" :disabled="!draft.column || !draft.operator" @click="addFilter" />
+            </div>
+            <div v-if="activeFilters.length" class="chips">
+              <Chip
+                v-for="(f, i) in activeFilters"
+                :key="i"
+                :label="filterLabel(f, labelOf(f.column))"
+                removable
+                @remove="removeFilter(i)"
               />
             </div>
           </div>
 
-          <Message v-if="actionError" severity="error" :closable="true" class="action-error">
-            {{ actionError }}
-          </Message>
+          <Message v-if="actionError" severity="error" :closable="true" class="action-error">{{ actionError }}</Message>
 
-          <EmptyState
-            v-if="screenState === 'empty'"
-            icon="pi pi-inbox"
-            title="Нет данных"
-            hint="По текущему запросу строк не найдено."
-          />
+          <EmptyState v-if="screenState === 'empty'" icon="pi pi-inbox" title="Нет данных" hint="По текущему запросу строк не найдено." />
           <template v-else>
-            <DataTable :value="rows" :loading="tableLoading" stripedRows size="small" scrollable class="data-table">
-              <template #loading>
-                <ProgressSpinner style="width: 2rem; height: 2rem" />
-              </template>
-              <Column v-for="col in columns" :key="col.source_name" :header="col.label">
-                <template #body="{ data }">
-                  {{ formatCell(data[col.source_name], col.display_type) }}
-                </template>
+            <DataTable
+              :value="rows"
+              :loading="tableLoading"
+              lazy
+              :sort-field="sort?.column"
+              :sort-order="sort ? (sort.dir === 'asc' ? 1 : -1) : 0"
+              removable-sort
+              striped-rows
+              size="small"
+              scrollable
+              class="data-table"
+              @sort="onSort"
+            >
+              <template #loading><ProgressSpinner style="width: 2rem; height: 2rem" /></template>
+              <Column
+                v-for="col in columns"
+                :key="col.source_name"
+                :field="col.source_name"
+                :header="col.label"
+                :sortable="sortableFor(col.source_name)"
+              >
+                <template #body="{ data }">{{ formatCell(data[col.source_name], col.display_type) }}</template>
               </Column>
             </DataTable>
 
@@ -235,15 +281,7 @@ const pageSizeOptions = computed(() => {
                 <span v-if="countReady">{{ total.toLocaleString('ru-RU') }}</span>
                 <span v-else class="counting"><i class="pi pi-spin pi-spinner" /> …</span>
               </span>
-              <Button
-                v-if="hasMore"
-                label="Показать ещё"
-                icon="pi pi-chevron-down"
-                outlined
-                size="small"
-                :loading="loadingMore"
-                @click="loadMore"
-              />
+              <Button v-if="hasMore" label="Показать ещё" icon="pi pi-chevron-down" outlined size="small" :loading="loadingMore" @click="loadMore" />
             </div>
           </template>
         </template>
@@ -253,54 +291,20 @@ const pageSizeOptions = computed(() => {
 </template>
 
 <style scoped>
-.center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 2.5rem 0;
-}
-.loading-text {
-  margin: 0;
-  font-size: 0.9rem;
-  color: var(--p-text-muted-color);
-}
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-.toolbar-right {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-.search :deep(input) {
-  min-width: 16rem;
-}
-.action-error {
-  margin-bottom: 1rem;
-}
-.data-table {
-  border: 1px solid var(--ehd-border);
-  border-radius: var(--ehd-radius-sm);
-  overflow: hidden;
-}
-.pager {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 1rem;
-}
-.loaded {
-  font-size: 0.85rem;
-  color: var(--p-text-muted-color);
-}
-.counting {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-}
+.center { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; padding: 2.5rem 0; }
+.loading-text { margin: 0; font-size: 0.9rem; color: var(--p-text-muted-color); }
+.toolbar { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+.toolbar-right { margin-left: auto; display: flex; align-items: center; gap: 0.6rem; }
+.search :deep(input) { min-width: 16rem; }
+.filters { margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.6rem; }
+.filter-builder { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.fb-col { min-width: 12rem; }
+.fb-op { min-width: 11rem; }
+.fb-val :deep(input) { min-width: 12rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.action-error { margin-bottom: 1rem; }
+.data-table { border: 1px solid var(--ehd-border); border-radius: var(--ehd-radius-sm); overflow: hidden; }
+.pager { display: flex; align-items: center; justify-content: space-between; margin-top: 1rem; }
+.loaded { font-size: 0.85rem; color: var(--p-text-muted-color); }
+.counting { display: inline-flex; align-items: center; gap: 0.25rem; }
 </style>

@@ -132,7 +132,7 @@ export interface FilterSpec {
 export interface QuerySpec {
   filters?: FilterSpec[]
   search?: string
-  sort?: { dir?: 'asc' | 'desc' }
+  sort?: { column?: string; dir?: 'asc' | 'desc' }
   page_size?: number
   cursor?: string
 }

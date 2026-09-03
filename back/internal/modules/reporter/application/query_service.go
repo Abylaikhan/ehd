@@ -280,14 +280,6 @@ func buildPlan(snap domain.PublishedSnapshot, spec domain.QuerySpec, req Request
 		selectCols = append(selectCols, c.SourceName)
 		inSelect[c.SourceName] = struct{}{}
 	}
-	// keyset-колонки нужны в SELECT для чтения курсора (даже если скрыты)
-	for _, k := range keysetCols {
-		if _, ok := inSelect[k]; !ok {
-			selectCols = append(selectCols, k)
-			inSelect[k] = struct{}{}
-		}
-	}
-
 	filters, err := validateFilters(byName, spec)
 	if err != nil {
 		return querybuilder.Plan{}, planMeta{}, err
@@ -295,7 +287,37 @@ func buildPlan(snap domain.PublishedSnapshot, spec domain.QuerySpec, req Request
 	search := buildSearch(snap, spec)
 	rs := buildRowScope(snap, req, preview)
 
-	// keyset
+	// Порядок = keyset-ключ; при пользовательской сортировке колонка-sortable ставится
+	// впереди ключа (keyset остаётся тай-брейкером → корректная пагинация).
+	orderCols := keysetCols
+	orderTypes := keysetTypesOf(snap)
+	if spec.SortColumn != "" {
+		col, ok := byName[spec.SortColumn]
+		if !ok || !col.Sortable {
+			return querybuilder.Plan{}, planMeta{}, domain.ErrQueryValidation
+		}
+		orderCols = []string{spec.SortColumn}
+		orderTypes = []string{col.SourceType}
+		for i, k := range keysetCols {
+			if k == spec.SortColumn {
+				continue
+			}
+			orderCols = append(orderCols, k)
+			if i < len(keysetTypesOf(snap)) {
+				orderTypes = append(orderTypes, keysetTypesOf(snap)[i])
+			} else {
+				orderTypes = append(orderTypes, "")
+			}
+		}
+	}
+	// колонки порядка нужны в SELECT для чтения курсора (даже если скрыты)
+	for _, k := range orderCols {
+		if _, ok := inSelect[k]; !ok {
+			selectCols = append(selectCols, k)
+			inSelect[k] = struct{}{}
+		}
+	}
+
 	dir := snap.KeysetDir
 	if spec.SortDir == domain.SortAsc || spec.SortDir == domain.SortDesc {
 		dir = spec.SortDir
@@ -303,7 +325,7 @@ func buildPlan(snap domain.PublishedSnapshot, spec domain.QuerySpec, req Request
 	if dir == "" {
 		dir = domain.SortAsc
 	}
-	cursor, err := decodeCursor(spec.Cursor, keysetTypesOf(snap))
+	cursor, err := decodeCursor(spec.Cursor, orderTypes)
 	if err != nil {
 		return querybuilder.Plan{}, planMeta{}, domain.ErrQueryValidation
 	}
@@ -317,10 +339,10 @@ func buildPlan(snap domain.PublishedSnapshot, spec domain.QuerySpec, req Request
 		Filters:    filters,
 		Search:     search,
 		RowScope:   rs,
-		Keyset:     querybuilder.Keyset{Columns: keysetCols, Dir: dir, Cursor: cursor},
+		Keyset:     querybuilder.Keyset{Columns: orderCols, Dir: dir, Cursor: cursor},
 		Limit:      pageSize + 1, // +1 для определения следующей страницы
 	}
-	return plan, planMeta{keysetColumns: keysetCols, pageSize: pageSize, visibleOrder: visibleOrder}, nil
+	return plan, planMeta{keysetColumns: orderCols, pageSize: pageSize, visibleOrder: visibleOrder}, nil
 }
 
 // buildResult нарезает страницу, вычисляет next_cursor и оставляет только видимые колонки.

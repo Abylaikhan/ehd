@@ -68,11 +68,12 @@ type Filter struct {
 
 // QuerySpec — единственный контракт, принимаемый /query (SQL-текст запрещён).
 type QuerySpec struct {
-	Filters  []Filter
-	Search   string
-	SortDir  string
-	PageSize int
-	Cursor   string
+	Filters    []Filter
+	Search     string
+	SortColumn string // колонка пользовательской сортировки (должна быть sortable); пусто — порядок по keyset
+	SortDir    string
+	PageSize   int
+	Cursor     string
 }
 
 // ResultColumn — описание колонки в ответе данных.
