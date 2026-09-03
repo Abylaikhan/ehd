@@ -12,6 +12,8 @@ import type {
   Role,
   QuerySpec,
   QueryResult,
+  MenuItem,
+  MenuItemPayload,
 } from '~~/shared/api/types'
 
 // Админ-клиент Reporter (backend slices 003–005): источники, интроспекция, витрины, роли.
@@ -46,7 +48,15 @@ export function useReporterAdmin() {
     remove: (id: string) => api(`${base}/views/${enc(id)}`, { method: 'DELETE' }),
   }
 
+  const menu = {
+    list: () => api<ItemsResponse<MenuItem>>(`${base}/menu`),
+    create: (payload: MenuItemPayload) => api<MenuItem>(`${base}/menu`, { method: 'POST', body: payload }),
+    update: (id: string, payload: MenuItemPayload) =>
+      api<MenuItem>(`${base}/menu/${enc(id)}`, { method: 'PATCH', body: payload }),
+    remove: (id: string) => api(`${base}/menu/${enc(id)}`, { method: 'DELETE' }),
+  }
+
   const roles = () => api<ItemsResponse<Role>>('/api/v1/auth/admin/roles')
 
-  return { sources, views, roles }
+  return { sources, views, roles, menu }
 }

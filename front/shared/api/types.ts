@@ -153,6 +153,41 @@ export interface CountResult {
   total_count: number
 }
 
+// --- Reporter: меню/навигация (backend slice 007) ---
+
+export interface MenuItem {
+  id: string
+  parent_id: string
+  data_view_id: string
+  name_ru: string
+  name_kk: string
+  icon_key: string
+  position: number
+  is_disabled: boolean
+  public_access: boolean
+  role_codes: string[]
+}
+
+export interface MenuNode {
+  id: string
+  title: string
+  icon: string
+  to: string
+  children: MenuNode[] | null
+}
+
+export interface MenuItemPayload {
+  parent_id?: string
+  data_view_id?: string
+  name_ru: string
+  name_kk?: string
+  icon_key?: string
+  position?: number
+  is_disabled?: boolean
+  public_access?: boolean
+  role_codes?: string[]
+}
+
 // --- Reporter admin: конструктор витрин (backend slices 003–005) ---
 
 export interface DataSourceSummary {

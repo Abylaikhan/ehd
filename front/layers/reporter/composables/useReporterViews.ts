@@ -5,6 +5,7 @@ import type {
   QuerySpec,
   QueryResult,
   CountResult,
+  MenuNode,
 } from '~~/shared/api/types'
 import { filenameFromDisposition } from '../utils/format'
 
@@ -14,6 +15,8 @@ export function useReporterViews() {
   const enc = (s: string) => encodeURIComponent(s)
 
   const list = () => api<ItemsResponse<UserViewListItem>>('/api/v1/reporter/views')
+
+  const navigation = () => api<ItemsResponse<MenuNode>>('/api/v1/reporter/navigation')
 
   const meta = (slug: string) => api<ViewMeta>(`/api/v1/reporter/views/${enc(slug)}`)
 
@@ -42,5 +45,5 @@ export function useReporterViews() {
     URL.revokeObjectURL(url)
   }
 
-  return { list, meta, query, count, exportView }
+  return { list, navigation, meta, query, count, exportView }
 }

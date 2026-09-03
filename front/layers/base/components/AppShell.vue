@@ -1,23 +1,59 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
+import type { MenuNode } from '~~/shared/api/types'
 
-// Каркас ЕХД: левая навигация (бренд-navy) + верхняя панель + рабочая область.
-// Состав навигации зависит от прав пользователя (session store).
+// Каркас ЕХД БО: левая навигация (бренд-navy) + верхняя панель + рабочая область.
+// Состав навигации зависит от прав пользователя (session store) и меню Reporter.
 const route = useRoute()
 const session = useSessionStore()
 const auth = useAuth()
+const reporterViews = useReporterViews()
 const collapsed = ref(false)
 
+// Разрешённое дерево навигации Reporter (строится backend по ролям).
+const { data: navTree } = useAsyncData('reporter-nav', () =>
+  session.isAuthenticated
+    ? reporterViews
+        .navigation()
+        .then((r) => r.items)
+        .catch(() => [] as MenuNode[])
+    : Promise.resolve([] as MenuNode[]),
+)
+
+type NavLeaf = { label: string; icon: string; to: string }
+function collectLeaves(node: MenuNode): NavLeaf[] {
+  const out: NavLeaf[] = []
+  for (const c of node.children ?? []) {
+    if (c.to) out.push({ label: c.title, icon: c.icon || 'pi pi-table', to: c.to })
+    out.push(...collectLeaves(c))
+  }
+  return out
+}
+
 const sections = computed(() => {
-  const list = [
+  const list: { title: string; items: NavLeaf[] }[] = [
     { title: 'Обзор', items: [{ label: 'Панель мониторинга', icon: 'pi pi-th-large', to: '/' }] },
-    { title: 'Reporter', items: [{ label: 'Витрины', icon: 'pi pi-table', to: '/reporter' }] },
   ]
+
+  // Reporter: каталог витрин + пункты-ссылки верхнего уровня из меню
+  const reporterItems: NavLeaf[] = [{ label: 'Витрины', icon: 'pi pi-table', to: '/reporter' }]
+  const menuSections: { title: string; items: NavLeaf[] }[] = []
+  for (const n of navTree.value ?? []) {
+    if (n.to) reporterItems.push({ label: n.title, icon: n.icon || 'pi pi-table', to: n.to })
+    else {
+      const items = collectLeaves(n)
+      if (items.length) menuSections.push({ title: n.title, items })
+    }
+  }
+  list.push({ title: 'Reporter', items: reporterItems })
+  list.push(...menuSections)
+
   if (session.isAdmin) {
     list.push({
       title: 'Администрирование',
       items: [
         { label: 'Конструктор витрин', icon: 'pi pi-table', to: '/reporter/admin/views' },
+        { label: 'Навигация', icon: 'pi pi-sitemap', to: '/reporter/admin/menu' },
         { label: 'Пользователи', icon: 'pi pi-users', to: '/reporter/admin/users' },
         { label: 'Роли', icon: 'pi pi-id-card', to: '/reporter/admin/roles' },
       ],
