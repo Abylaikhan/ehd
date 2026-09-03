@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { QuerySpec, FilterSpec } from '~~/shared/api/types'
 import { formatCell } from '../../utils/format'
-import { buildFilterSpec, operatorNeedsValue, operatorLabel, filterLabel } from '../../utils/filters'
+import { defaultOperator } from '../../utils/filters'
 
 // Пользовательская таблица витрины (REP-FR-050..055).
 definePageMeta({ middleware: 'auth' })
@@ -38,7 +38,6 @@ function currentSpec(cursor?: string): QuerySpec {
   }
 }
 
-// ключи-триггеры перезагрузки (поиск/размер/фильтры/сортировка)
 const filtersKey = computed(() => JSON.stringify(activeFilters.value))
 const sortKey = computed(() => JSON.stringify(sort.value))
 
@@ -103,10 +102,18 @@ function applySearch() {
   search.value = searchInput.value.trim()
 }
 
-// --- сортировка по колонке (клик по заголовку) ---
-function sortableFor(name: string): boolean {
-  return (meta.value?.columns ?? []).some((c) => c.source_name === name && c.sortable)
-}
+// --- метаданные колонок: флаги sortable/filterable/type ---
+const colMeta = computed(() => {
+  const m: Record<string, { sortable: boolean; filterable: boolean; display_type: string }> = {}
+  for (const c of meta.value?.columns ?? []) {
+    m[c.source_name] = { sortable: c.sortable, filterable: c.filterable, display_type: c.display_type }
+  }
+  return m
+})
+const sortableFor = (name: string) => colMeta.value[name]?.sortable ?? false
+const filterableFor = (name: string) => colMeta.value[name]?.filterable ?? false
+
+// --- клик-сортировка по колонке ---
 function onSort(e: { sortField?: string | null; sortOrder?: number | null }) {
   if (e.sortField && e.sortOrder) {
     sort.value = { column: String(e.sortField), dir: e.sortOrder === 1 ? 'asc' : 'desc' }
@@ -115,34 +122,32 @@ function onSort(e: { sortField?: string | null; sortOrder?: number | null }) {
   }
 }
 
-// --- фильтры ---
-const filterCols = computed(() => (meta.value?.columns ?? []).filter((c) => c.filterable))
-const draft = reactive({ column: '', operator: '', value: '' })
-const draftOperators = computed(() => {
-  const col = filterCols.value.find((c) => c.source_name === draft.column)
-  return (col?.operators ?? []).map((op) => ({ label: operatorLabel(op), value: op }))
-})
-const draftNeedsValue = computed(() => draft.operator !== '' && operatorNeedsValue(draft.operator))
+// --- inline-фильтры под заголовками (PrimeVue filterDisplay="row") ---
+type FilterCell = { value: string | null; matchMode: string }
+const pvFilters = ref<Record<string, FilterCell>>({})
 watch(
-  () => draft.column,
-  () => {
-    draft.operator = ''
-    draft.value = ''
+  meta,
+  (m) => {
+    const next: Record<string, FilterCell> = {}
+    for (const c of m?.columns ?? []) {
+      if (c.filterable) next[c.source_name] = pvFilters.value[c.source_name] ?? { value: null, matchMode: 'contains' }
+    }
+    pvFilters.value = next
   },
+  { immediate: true },
 )
-function labelOf(colName: string): string {
-  return (meta.value?.columns ?? []).find((c) => c.source_name === colName)?.label ?? colName
-}
-function addFilter() {
-  const spec = buildFilterSpec(draft.column, draft.operator, draft.value)
-  if (!spec) return
-  activeFilters.value = [...activeFilters.value, spec]
-  draft.column = ''
-  draft.operator = ''
-  draft.value = ''
-}
-function removeFilter(i: number) {
-  activeFilters.value = activeFilters.value.filter((_, idx) => idx !== i)
+
+// применяет значения фильтр-ряда → activeFilters (перезагрузка через watch)
+function applyColumnFilters() {
+  const out: FilterSpec[] = []
+  for (const c of meta.value?.columns ?? []) {
+    if (!c.filterable) continue
+    const raw = pvFilters.value[c.source_name]?.value
+    const v = (raw ?? '').toString().trim()
+    if (v === '') continue
+    out.push({ column: c.source_name, operator: defaultOperator(c.display_type), value: v })
+  }
+  activeFilters.value = out
 }
 
 // --- экспорт ---
@@ -187,10 +192,10 @@ const screenState = computed(() => {
   }
   if (metaError.value || dataError.value) return 'error'
   if (!queryData.value) return 'loading'
-  if (rows.value.length === 0) return 'empty'
   return 'ready'
 })
 
+const isEmpty = computed(() => !!queryData.value && rows.value.length === 0)
 const tableLoading = computed(() => dataPending.value || loadingMore.value)
 const countReady = computed(() => !countPending.value && countData.value != null)
 
@@ -221,69 +226,63 @@ const pageSizeOptions = computed(() => {
               <InputIcon class="pi pi-search" />
               <InputText v-model="searchInput" placeholder="Поиск..." @keyup.enter="applySearch" @blur="applySearch" />
             </IconField>
+            <span class="count">
+              Записей:
+              <b v-if="countReady">{{ total.toLocaleString('ru-RU') }}</b>
+              <span v-else class="counting"><i class="pi pi-spin pi-spinner" /></span>
+            </span>
             <div class="toolbar-right">
               <Select v-model="pageSize" :options="pageSizeOptions" placeholder="Размер страницы" aria-label="Размер страницы" />
               <Button label="Экспорт" icon="pi pi-download" :loading="exporting" :disabled="rows.length === 0" @click="doExport" />
             </div>
           </div>
 
-          <!-- Конструктор фильтров -->
-          <div v-if="filterCols.length" class="filters">
-            <div class="filter-builder">
-              <Select v-model="draft.column" :options="filterCols" option-label="label" option-value="source_name" placeholder="Колонка" class="fb-col" />
-              <Select v-model="draft.operator" :options="draftOperators" option-label="label" option-value="value" placeholder="Условие" :disabled="!draft.column" class="fb-op" />
-              <InputText v-if="draftNeedsValue" v-model="draft.value" placeholder="Значение" class="fb-val" @keyup.enter="addFilter" />
-              <Button label="Добавить фильтр" icon="pi pi-plus" outlined size="small" :disabled="!draft.column || !draft.operator" @click="addFilter" />
-            </div>
-            <div v-if="activeFilters.length" class="chips">
-              <Chip
-                v-for="(f, i) in activeFilters"
-                :key="i"
-                :label="filterLabel(f, labelOf(f.column))"
-                removable
-                @remove="removeFilter(i)"
-              />
-            </div>
-          </div>
-
           <Message v-if="actionError" severity="error" :closable="true" class="action-error">{{ actionError }}</Message>
 
-          <EmptyState v-if="screenState === 'empty'" icon="pi pi-inbox" title="Нет данных" hint="По текущему запросу строк не найдено." />
-          <template v-else>
-            <DataTable
-              :value="rows"
-              :loading="tableLoading"
-              lazy
-              :sort-field="sort?.column"
-              :sort-order="sort ? (sort.dir === 'asc' ? 1 : -1) : 0"
-              removable-sort
-              striped-rows
-              size="small"
-              scrollable
-              class="data-table"
-              @sort="onSort"
+          <DataTable
+            :value="rows"
+            :loading="tableLoading"
+            lazy
+            v-model:filters="pvFilters"
+            filter-display="row"
+            :sort-field="sort?.column"
+            :sort-order="sort ? (sort.dir === 'asc' ? 1 : -1) : 0"
+            removable-sort
+            striped-rows
+            size="small"
+            scrollable
+            class="data-table"
+            @sort="onSort"
+          >
+            <template #loading><ProgressSpinner style="width: 2rem; height: 2rem" /></template>
+            <template #empty>
+              <div class="empty-row">По текущему запросу строк не найдено.</div>
+            </template>
+            <Column
+              v-for="col in columns"
+              :key="col.source_name"
+              :field="col.source_name"
+              :header="col.label"
+              :sortable="sortableFor(col.source_name)"
+              :show-filter-menu="false"
             >
-              <template #loading><ProgressSpinner style="width: 2rem; height: 2rem" /></template>
-              <Column
-                v-for="col in columns"
-                :key="col.source_name"
-                :field="col.source_name"
-                :header="col.label"
-                :sortable="sortableFor(col.source_name)"
-              >
-                <template #body="{ data }">{{ formatCell(data[col.source_name], col.display_type) }}</template>
-              </Column>
-            </DataTable>
+              <template v-if="filterableFor(col.source_name)" #filter="{ filterModel, filterCallback }">
+                <InputText
+                  v-model="filterModel.value"
+                  placeholder="Все"
+                  class="col-filter"
+                  @keyup.enter="() => { filterCallback(); applyColumnFilters() }"
+                  @blur="() => { filterCallback(); applyColumnFilters() }"
+                />
+              </template>
+              <template #body="{ data }">{{ formatCell(data[col.source_name], col.display_type) }}</template>
+            </Column>
+          </DataTable>
 
-            <div class="pager">
-              <span class="loaded">
-                Загружено {{ rows.length }} из
-                <span v-if="countReady">{{ total.toLocaleString('ru-RU') }}</span>
-                <span v-else class="counting"><i class="pi pi-spin pi-spinner" /> …</span>
-              </span>
-              <Button v-if="hasMore" label="Показать ещё" icon="pi pi-chevron-down" outlined size="small" :loading="loadingMore" @click="loadMore" />
-            </div>
-          </template>
+          <div v-if="!isEmpty" class="pager">
+            <span class="loaded">Загружено {{ rows.length }}</span>
+            <Button v-if="hasMore" label="Показать ещё" icon="pi pi-chevron-down" outlined size="small" :loading="loadingMore" @click="loadMore" />
+          </div>
         </template>
       </template>
     </Card>
@@ -293,18 +292,16 @@ const pageSizeOptions = computed(() => {
 <style scoped>
 .center { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; padding: 2.5rem 0; }
 .loading-text { margin: 0; font-size: 0.9rem; color: var(--p-text-muted-color); }
-.toolbar { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+.toolbar { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+.count { font-size: 0.9rem; color: var(--ehd-ink-2); }
+.count b { color: var(--ehd-ink); }
+.counting { display: inline-flex; align-items: center; }
 .toolbar-right { margin-left: auto; display: flex; align-items: center; gap: 0.6rem; }
 .search :deep(input) { min-width: 16rem; }
-.filters { margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.6rem; }
-.filter-builder { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-.fb-col { min-width: 12rem; }
-.fb-op { min-width: 11rem; }
-.fb-val :deep(input) { min-width: 12rem; }
-.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .action-error { margin-bottom: 1rem; }
 .data-table { border: 1px solid var(--ehd-border); border-radius: var(--ehd-radius-sm); overflow: hidden; }
+.col-filter { width: 100%; min-width: 7rem; }
+.empty-row { padding: 1.5rem; text-align: center; color: var(--p-text-muted-color); }
 .pager { display: flex; align-items: center; justify-content: space-between; margin-top: 1rem; }
 .loaded { font-size: 0.85rem; color: var(--p-text-muted-color); }
-.counting { display: inline-flex; align-items: center; gap: 0.25rem; }
 </style>

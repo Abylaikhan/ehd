@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { buildFilterSpec, operatorNeedsValue, operatorLabel, filterLabel } from './filters'
+import { buildFilterSpec, operatorNeedsValue, operatorLabel, filterLabel, defaultOperator } from './filters'
+
+describe('defaultOperator', () => {
+  it('текст → contains, остальное → eq', () => {
+    expect(defaultOperator('text')).toBe('contains')
+    expect(defaultOperator('number')).toBe('eq')
+    expect(defaultOperator('datetime')).toBe('eq')
+  })
+})
 
 describe('buildFilterSpec', () => {
   it('одиночное значение', () => {
