@@ -38,6 +38,17 @@ watch(
   (d) => {
     if (!d) return
     columns.value = d.columns.map((c) => ({ ...c }))
+    // Новая (ещё не настроенная) витрина: все колонки visible=false → по умолчанию
+    // проставляем все флаги, чтобы админ не отмечал вручную десятки колонок.
+    if (d.columns.length > 0 && d.columns.every((c) => !c.visible)) {
+      columns.value.forEach((c) => {
+        c.visible = true
+        c.searchable = true
+        c.filterable = true
+        c.sortable = true
+        c.exportable = true
+      })
+    }
     roleCodes.value = [...d.role_codes]
     Object.assign(meta, {
       name: d.name,
@@ -63,6 +74,16 @@ const sortDirOptions = [
   { label: 'по возрастанию', value: 'asc' },
   { label: 'по убыванию', value: 'desc' },
 ]
+
+// --- «отметить все» по каждому флаг-столбцу ---
+type FlagKey = 'visible' | 'searchable' | 'filterable' | 'sortable' | 'exportable'
+const allChecked = (flag: FlagKey): boolean =>
+  columns.value.length > 0 && columns.value.every((c) => c[flag])
+const toggleAll = (flag: FlagKey, val: boolean) => {
+  columns.value.forEach((c) => {
+    c[flag] = val
+  })
+}
 
 // --- сохранение секций ---
 const msg = ref<{ severity: string; text: string } | null>(null)
@@ -179,11 +200,56 @@ async function doPreview() {
             <Column header="Порядок" style="width: 6rem">
               <template #body="{ data: c }"><InputNumber v-model="c.position" :min="0" :useGrouping="false" class="cell-num" /></template>
             </Column>
-            <Column header="Видима"><template #body="{ data: c }"><Checkbox v-model="c.visible" :binary="true" /></template></Column>
-            <Column header="Поиск"><template #body="{ data: c }"><Checkbox v-model="c.searchable" :binary="true" /></template></Column>
-            <Column header="Фильтр"><template #body="{ data: c }"><Checkbox v-model="c.filterable" :binary="true" /></template></Column>
-            <Column header="Сортировка"><template #body="{ data: c }"><Checkbox v-model="c.sortable" :binary="true" /></template></Column>
-            <Column header="Экспорт"><template #body="{ data: c }"><Checkbox v-model="c.exportable" :binary="true" /></template></Column>
+            <Column>
+              <template #header>
+                <div class="flag-head">
+                  <span>Видима</span>
+                  <Checkbox :model-value="allChecked('visible')" :binary="true" v-tooltip.top="'Отметить все'"
+                    @update:model-value="(v: boolean) => toggleAll('visible', v)" />
+                </div>
+              </template>
+              <template #body="{ data: c }"><Checkbox v-model="c.visible" :binary="true" /></template>
+            </Column>
+            <Column>
+              <template #header>
+                <div class="flag-head">
+                  <span>Поиск</span>
+                  <Checkbox :model-value="allChecked('searchable')" :binary="true" v-tooltip.top="'Отметить все'"
+                    @update:model-value="(v: boolean) => toggleAll('searchable', v)" />
+                </div>
+              </template>
+              <template #body="{ data: c }"><Checkbox v-model="c.searchable" :binary="true" /></template>
+            </Column>
+            <Column>
+              <template #header>
+                <div class="flag-head">
+                  <span>Фильтр</span>
+                  <Checkbox :model-value="allChecked('filterable')" :binary="true" v-tooltip.top="'Отметить все'"
+                    @update:model-value="(v: boolean) => toggleAll('filterable', v)" />
+                </div>
+              </template>
+              <template #body="{ data: c }"><Checkbox v-model="c.filterable" :binary="true" /></template>
+            </Column>
+            <Column>
+              <template #header>
+                <div class="flag-head">
+                  <span>Сортировка</span>
+                  <Checkbox :model-value="allChecked('sortable')" :binary="true" v-tooltip.top="'Отметить все'"
+                    @update:model-value="(v: boolean) => toggleAll('sortable', v)" />
+                </div>
+              </template>
+              <template #body="{ data: c }"><Checkbox v-model="c.sortable" :binary="true" /></template>
+            </Column>
+            <Column>
+              <template #header>
+                <div class="flag-head">
+                  <span>Экспорт</span>
+                  <Checkbox :model-value="allChecked('exportable')" :binary="true" v-tooltip.top="'Отметить все'"
+                    @update:model-value="(v: boolean) => toggleAll('exportable', v)" />
+                </div>
+              </template>
+              <template #body="{ data: c }"><Checkbox v-model="c.exportable" :binary="true" /></template>
+            </Column>
           </DataTable>
         </template>
       </Card>
@@ -272,6 +338,7 @@ async function doPreview() {
 .source-row { display: flex; flex-wrap: wrap; gap: 2rem; }
 .source-row .k { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ehd-muted); }
 .source-row .v { font-weight: 600; }
+.flag-head { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; white-space: nowrap; }
 .cell-input { width: 100%; }
 .cell-num :deep(.p-inputtext) { width: 5rem; }
 .muted { color: var(--p-text-muted-color); font-size: 0.85rem; }
