@@ -29,6 +29,8 @@ const meta = reactive({
   row_scope_mode: 'by_profile',
   keyset_column: '',
   keyset_dir: 'asc',
+  default_sort_column: '',
+  default_sort_dir: 'desc',
   row_scope_region_column: '',
   row_scope_department_column: '',
 })
@@ -61,6 +63,8 @@ watch(
       row_scope_mode: d.row_scope_mode,
       keyset_column: d.keyset_column,
       keyset_dir: d.keyset_dir,
+      default_sort_column: d.default_sort_column,
+      default_sort_dir: d.default_sort_dir || 'desc',
       row_scope_region_column: d.row_scope_region_column,
       row_scope_department_column: d.row_scope_department_column,
     })
@@ -69,6 +73,8 @@ watch(
 )
 
 const colNames = computed(() => columns.value.map((c) => c.source_name))
+// Сортировка по умолчанию допустима только по sortable-колонке (иначе backend её игнорирует).
+const sortableColNames = computed(() => columns.value.filter((c) => c.sortable).map((c) => c.source_name))
 const displayTypeOptions = DISPLAY_TYPES.map((t) => ({ label: t, value: t }))
 const sortDirOptions = [
   { label: 'по возрастанию', value: 'asc' },
@@ -122,6 +128,8 @@ const saveMeta = () =>
         row_scope_mode: meta.row_scope_mode,
         keyset_column: meta.keyset_column || undefined,
         keyset_dir: meta.keyset_dir || undefined,
+        default_sort_column: meta.default_sort_column || undefined,
+        default_sort_dir: meta.default_sort_dir || undefined,
         row_scope_region_column: meta.row_scope_region_column || undefined,
         row_scope_department_column: meta.row_scope_department_column || undefined,
       }),
@@ -295,6 +303,26 @@ async function doPreview() {
             <div class="field">
               <label>Направление ключа</label>
               <Select v-model="meta.keyset_dir" :options="sortDirOptions" option-label="label" option-value="value" />
+            </div>
+            <div class="field">
+              <label>Сортировка по умолчанию</label>
+              <Select
+                v-model="meta.default_sort_column"
+                :options="sortableColNames"
+                show-clear
+                placeholder="— порядок по ключу —"
+              />
+              <small class="hint">Свежие данные сверху: обычно дата ↓. Только sortable-колонки.</small>
+            </div>
+            <div class="field">
+              <label>Направление сортировки</label>
+              <Select
+                v-model="meta.default_sort_dir"
+                :options="sortDirOptions"
+                option-label="label"
+                option-value="value"
+                :disabled="!meta.default_sort_column"
+              />
             </div>
             <div class="field">
               <label>Размер страницы (по умолч.)</label>

@@ -287,6 +287,19 @@ func buildPlan(snap domain.PublishedSnapshot, spec domain.QuerySpec, req Request
 	search := buildSearch(snap, spec)
 	rs := buildRowScope(snap, req, preview)
 
+	// «Свежие данные по умолчанию»: если пользователь не задал сортировку, применяем
+	// сорт по умолчанию, настроенный на витрине (обычно дата/rownum ↓ → новые сверху).
+	// Некорректный дефолт (нет колонки / не sortable) молча игнорируется → порядок по keyset,
+	// чтобы ошибка конфигурации не роняла запросы всех пользователей.
+	if spec.SortColumn == "" && snap.DefaultSortColumn != "" {
+		if col, ok := byName[snap.DefaultSortColumn]; ok && col.Sortable {
+			spec.SortColumn = snap.DefaultSortColumn
+			if spec.SortDir == "" {
+				spec.SortDir = snap.DefaultSortDir
+			}
+		}
+	}
+
 	// Порядок = keyset-ключ; при пользовательской сортировке колонка-sortable ставится
 	// впереди ключа (keyset остаётся тай-брейкером → корректная пагинация).
 	orderCols := keysetCols
