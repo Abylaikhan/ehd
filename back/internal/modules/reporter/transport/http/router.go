@@ -42,6 +42,13 @@ func Register(r fiber.Router, h *Handler, guard *Guard) {
 	views.Post("/:id/disable", h.disableView)
 	views.Post("/:id/preview", h.previewView) // админ-предпросмотр черновика
 
+	// меню/навигация (админ)
+	menu := admin.Group("/menu")
+	menu.Get("", h.adminListMenu)
+	menu.Post("", h.adminCreateMenu)
+	menu.Patch("/:id", h.adminUpdateMenu)
+	menu.Delete("/:id", h.adminDeleteMenu)
+
 	// пользовательские представления (активная сессия, RBAC по ролям snapshot)
 	user := r.Group("", guard.RequireAuth)
 	user.Get("/views", h.listUserViews)
@@ -49,4 +56,5 @@ func Register(r fiber.Router, h *Handler, guard *Guard) {
 	user.Post("/views/:slug/query", h.userQuery)
 	user.Post("/views/:slug/count", h.userCount)
 	user.Post("/views/:slug/export", h.exportView)
+	user.Get("/navigation", h.userNavigation)
 }

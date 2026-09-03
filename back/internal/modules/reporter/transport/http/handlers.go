@@ -10,15 +10,16 @@ import (
 	"ehd-api/pkg/httpserver"
 )
 
-// Handler — HTTP-хендлеры Reporter Module (источник, интроспекция, представления, запросы).
+// Handler — HTTP-хендлеры Reporter Module (источник, интроспекция, представления, запросы, меню).
 type Handler struct {
 	svc   *application.Service
 	views *application.ViewService
 	query *application.QueryService
+	menu  *application.MenuService
 }
 
-func NewHandler(svc *application.Service, views *application.ViewService, query *application.QueryService) *Handler {
-	return &Handler{svc: svc, views: views, query: query}
+func NewHandler(svc *application.Service, views *application.ViewService, query *application.QueryService, menu *application.MenuService) *Handler {
+	return &Handler{svc: svc, views: views, query: query, menu: menu}
 }
 
 func badRequest(field, reason string) *httpserver.APIError {
@@ -191,6 +192,16 @@ func mapErr(err error) error {
 		return httpserver.NewError(fiber.StatusUnprocessableEntity, "QUERY_VALIDATION", "Некорректный запрос данных")
 	case errors.Is(err, domain.ErrViewNotConfigured):
 		return httpserver.NewError(fiber.StatusUnprocessableEntity, "VIEW_NOT_CONFIGURED", "Представление не сконфигурировано для запросов")
+	case errors.Is(err, domain.ErrMenuNotFound):
+		return httpserver.NewError(fiber.StatusNotFound, "MENU_NOT_FOUND", "Пункт меню не найден")
+	case errors.Is(err, domain.ErrMenuCycle):
+		return httpserver.NewError(fiber.StatusUnprocessableEntity, "MENU_CYCLE", "Недопустимая вложенность меню (цикл)")
+	case errors.Is(err, domain.ErrMenuDepth):
+		return httpserver.NewError(fiber.StatusUnprocessableEntity, "MENU_DEPTH", "Превышена максимальная глубина меню (3)")
+	case errors.Is(err, domain.ErrMenuHasChildren):
+		return httpserver.NewError(fiber.StatusConflict, "MENU_HAS_CHILDREN", "Сначала удалите вложенные пункты")
+	case errors.Is(err, domain.ErrMenuValidation):
+		return httpserver.NewError(fiber.StatusUnprocessableEntity, "VALIDATION_ERROR", "Некорректные данные пункта меню")
 	case errors.Is(err, domain.ErrExportBusy):
 		return httpserver.NewError(fiber.StatusTooManyRequests, "EXPORT_BUSY", "Экспорт уже выполняется, повторите позже")
 	case errors.Is(err, domain.ErrExportTooLarge):

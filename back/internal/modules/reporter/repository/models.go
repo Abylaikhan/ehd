@@ -109,6 +109,32 @@ type ViewPermissionModel struct {
 
 func (ViewPermissionModel) TableName() string { return "view_permissions" }
 
+// MenuItemModel — пункт навигации Reporter (ТЗ, menu_items).
+type MenuItemModel struct {
+	ID           uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	ParentID     *uuid.UUID `gorm:"type:uuid;index"`
+	DataViewID   *uuid.UUID `gorm:"type:uuid;index"`
+	NameRu       string     `gorm:"size:255;not null"`
+	NameKk       string     `gorm:"size:255"`
+	IconKey      string     `gorm:"size:64"`
+	Position     int        `gorm:"not null;default:0"`
+	IsDisabled   bool       `gorm:"not null;default:false"`
+	PublicAccess bool       `gorm:"not null;default:false"`
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+func (MenuItemModel) TableName() string { return "menu_items" }
+
+// MenuItemRoleModel — роли, которым виден пункт при public_access=false.
+type MenuItemRoleModel struct {
+	ID         uuid.UUID `gorm:"type:uuid;primaryKey"`
+	MenuItemID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_menu_role,priority:1"`
+	RoleCode   string    `gorm:"size:64;not null;uniqueIndex:idx_menu_role,priority:2"`
+}
+
+func (MenuItemRoleModel) TableName() string { return "menu_item_roles" }
+
 // Migrate создаёт/обновляет таблицы Reporter через GORM AutoMigrate.
 func Migrate(db *gorm.DB) error {
 	return db.AutoMigrate(
@@ -117,5 +143,7 @@ func Migrate(db *gorm.DB) error {
 		&DataViewModel{},
 		&ViewColumnModel{},
 		&ViewPermissionModel{},
+		&MenuItemModel{},
+		&MenuItemRoleModel{},
 	)
 }
