@@ -118,7 +118,8 @@ func Run(cfg *config.Config) error {
 		log,
 	)
 	reporterQueryService := reporterapp.NewQueryService(dataViewRepo, reporterService, log)
-	reporterHandler := reporterhttp.NewHandler(reporterService, reporterViewService, reporterQueryService)
+	reporterMenuService := reporterapp.NewMenuService(reporterrepo.NewMenuRepo(db))
+	reporterHandler := reporterhttp.NewHandler(reporterService, reporterViewService, reporterQueryService, reporterMenuService)
 	reporterGuard := reporterhttp.NewGuard(authService) // RBAC через auth/contract (без сети)
 
 	// --- ClickHouse (read-only проверка готовности источника по умолчанию) ---
