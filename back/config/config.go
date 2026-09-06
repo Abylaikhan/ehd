@@ -99,10 +99,13 @@ type Reporter struct {
 	SystemDBDenylist []string
 }
 
-// EVGA — модуль ОБМ ЕВГА: внешняя PostgreSQL obm_evga, строго read-only (спека 007, FR-1/2).
+// EVGA — модуль ОБМ ЕВГА: внешняя PostgreSQL obm_evga (спека 007 FR-1/2, спека 008 FR-1).
 // DSN необязателен: без него модуль выключен и маршруты не регистрируются.
+// WriteEnabled=false (по умолчанию) — строго read-only DSN, пишущие эндпоинты закрыты;
+// включается только после согласования миграций с заказчиком (dev-реплика — можно).
 type EVGA struct {
-	DSN string
+	DSN          string
+	WriteEnabled bool
 }
 
 // Enabled — модуль ЕВГА включён, если задан DSN внешней БД.
@@ -128,6 +131,7 @@ func New() (*Config, error) {
 	v.SetDefault("EDS_OCSP_ENABLED", true)
 	v.SetDefault("NCANODE_URL", "http://ncanode:14579")
 	v.SetDefault("REPORTER_SYSTEM_DB_DENYLIST", "system,INFORMATION_SCHEMA,information_schema")
+	v.SetDefault("EVGA_WRITE_ENABLED", false)
 
 	cfg := &Config{
 		App:  App{Name: v.GetString("APP_NAME"), Env: v.GetString("APP_ENV")},
@@ -162,7 +166,10 @@ func New() (*Config, error) {
 		Reporter: Reporter{
 			SystemDBDenylist: splitList(v.GetString("REPORTER_SYSTEM_DB_DENYLIST")),
 		},
-		EVGA: EVGA{DSN: v.GetString("EVGA_PG_DSN")},
+		EVGA: EVGA{
+			DSN:          v.GetString("EVGA_PG_DSN"),
+			WriteEnabled: v.GetBool("EVGA_WRITE_ENABLED"),
+		},
 	}
 
 	// local: дефолтные ключи для удобства; в non-local обязательны.

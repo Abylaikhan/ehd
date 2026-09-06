@@ -9,4 +9,6 @@ var (
 	ErrNotFound = errors.New("запись не найдена")
 	// ErrSourceUnavailable — внешняя БД obm_evga недоступна (spec, EVGA_SOURCE_UNAVAILABLE).
 	ErrSourceUnavailable = errors.New("источник obm_evga недоступен")
+	// ErrBulkLimit — bulk-запрос пуст или превышает предел (спека 008 FR-8, 400).
+	ErrBulkLimit = errors.New("список записей пуст или превышает допустимый размер")
 )

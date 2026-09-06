@@ -148,14 +148,18 @@ func Run(cfg *config.Config) error {
 	}
 	defer ch.Close()
 
-	// --- Модуль ОБМ ЕВГА (внешняя PostgreSQL obm_evga, строго read-only; спека 007) ---
+	// --- Модуль ОБМ ЕВГА (внешняя PostgreSQL obm_evga; спека 007, режим записи — спека 008 FR-1/2) ---
 	var evgaService *evgaapp.Service
+	var evgaStatusService *evgaapp.StatusService
 	if cfg.EVGA.Enabled() {
-		roDSN, err := evgaReadOnlyDSN(cfg.EVGA.DSN)
-		if err != nil {
-			return err
+		evgaDSN := cfg.EVGA.DSN
+		if !cfg.EVGA.WriteEnabled {
+			// без явного разрешения записи сессии внешней БД принудительно read-only
+			if evgaDSN, err = evgaReadOnlyDSN(evgaDSN); err != nil {
+				return err
+			}
 		}
-		evgaDB, err := postgres.New(roDSN)
+		evgaDB, err := postgres.New(evgaDSN)
 		if err != nil {
 			return err
 		}
@@ -172,9 +176,13 @@ func Run(cfg *config.Config) error {
 		if mode, err := evgaRepo.TransactionReadOnly(context.Background()); err != nil {
 			log.Warn("evga: не удалось проверить режим read-only", zap.Error(err))
 		} else {
-			log.Info("evga: подключение к obm_evga установлено", zap.String("default_transaction_read_only", mode))
+			log.Info("evga: подключение к obm_evga установлено",
+				zap.String("default_transaction_read_only", mode),
+				zap.Bool("write_enabled", cfg.EVGA.WriteEnabled))
 		}
 		evgaService = evgaapp.NewService(evgaRepo, authService, log)
+		evgaStatusService = evgaapp.NewStatusService(
+			evgarepo.NewStatusRepo(evgaDB), evgaService, cfg.EVGA.WriteEnabled, log)
 	} else {
 		log.Info("evga: модуль выключен (EVGA_PG_DSN не задан)")
 	}
@@ -214,7 +222,7 @@ func Run(cfg *config.Config) error {
 	authhttp.Register(api.Group("/auth"), authHandler)
 	reporterhttp.Register(api.Group("/reporter"), reporterHandler, reporterGuard)
 	if evgaService != nil {
-		evgahttp.Register(api.Group("/evga"), evgahttp.NewHandler(evgaService), evgahttp.NewGuard(authService))
+		evgahttp.Register(api.Group("/evga"), evgahttp.NewHandler(evgaService, evgaStatusService), evgahttp.NewGuard(authService))
 	}
 
 	// --- запуск + graceful shutdown ---
