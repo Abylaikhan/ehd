@@ -77,6 +77,9 @@ services:
       TEMP_PASSWORD_TTL: ${TEMP_PASSWORD_TTL:-72h}
       MAX_FAILED_ATTEMPTS: ${MAX_FAILED_ATTEMPTS:-3}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # Модуль ОБМ ЕВГА: dev-реплика obm_evga в этом же Postgres (tz/obm-evga-5-15a/scripts/load_dev_replica.sh).
+      # Пусто — модуль выключен. Read-only навязывается в коде (default_transaction_read_only).
+      EVGA_PG_DSN: ${EVGA_PG_DSN:-postgres://${POSTGRES_USER:-ehd}:${POSTGRES_PASSWORD:-ehd_local}@postgres:5432/obm_evga?sslmode=disable}
       # ЭЦП: stub (sandbox) или ncalayer (реальная проверка CMS по корням НУЦ РК из EDS_TRUST_DIR)
       EDS_MODE: ${EDS_MODE:-stub}
       EDS_TRUST_DIR: /app/eds-trust

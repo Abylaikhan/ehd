@@ -4,6 +4,8 @@ package app
 
 import (
 	"context"
+	"fmt"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -17,6 +19,9 @@ import (
 	"ehd-api/internal/modules/auth/eds"
 	authrepo "ehd-api/internal/modules/auth/repository"
 	authhttp "ehd-api/internal/modules/auth/transport/http"
+	evgaapp "ehd-api/internal/modules/evga/application"
+	evgarepo "ehd-api/internal/modules/evga/repository"
+	evgahttp "ehd-api/internal/modules/evga/transport/http"
 	reporterapp "ehd-api/internal/modules/reporter/application"
 	reporterch "ehd-api/internal/modules/reporter/chsource"
 	reporterrepo "ehd-api/internal/modules/reporter/repository"
@@ -27,6 +32,20 @@ import (
 	"ehd-api/pkg/logger"
 	"ehd-api/pkg/postgres"
 )
+
+// evgaReadOnlyDSN добавляет к DSN obm_evga сессионный параметр
+// default_transaction_read_only=on (pgx передаёт его как runtime-параметр стартапа) —
+// модуль ЕВГА работает с внешней БД строго в режиме чтения (спека 007 FR-2).
+func evgaReadOnlyDSN(dsn string) (string, error) {
+	u, err := url.Parse(dsn)
+	if err != nil || u.Scheme == "" {
+		return "", fmt.Errorf("EVGA_PG_DSN: ожидается URL postgres://…: %w", err)
+	}
+	q := u.Query()
+	q.Set("default_transaction_read_only", "on")
+	u.RawQuery = q.Encode()
+	return u.String(), nil
+}
 
 func Run(cfg *config.Config) error {
 	log, err := logger.New(cfg.Log.Level)
@@ -129,6 +148,37 @@ func Run(cfg *config.Config) error {
 	}
 	defer ch.Close()
 
+	// --- Модуль ОБМ ЕВГА (внешняя PostgreSQL obm_evga, строго read-only; спека 007) ---
+	var evgaService *evgaapp.Service
+	if cfg.EVGA.Enabled() {
+		roDSN, err := evgaReadOnlyDSN(cfg.EVGA.DSN)
+		if err != nil {
+			return err
+		}
+		evgaDB, err := postgres.New(roDSN)
+		if err != nil {
+			return err
+		}
+		evgaSQL, err := evgaDB.DB()
+		if err != nil {
+			return err
+		}
+		// внешняя прод-БД: скромный пул
+		evgaSQL.SetMaxOpenConns(5)
+		evgaSQL.SetMaxIdleConns(2)
+		defer evgaSQL.Close()
+
+		evgaRepo := evgarepo.NewRegistryRepo(evgaDB)
+		if mode, err := evgaRepo.TransactionReadOnly(context.Background()); err != nil {
+			log.Warn("evga: не удалось проверить режим read-only", zap.Error(err))
+		} else {
+			log.Info("evga: подключение к obm_evga установлено", zap.String("default_transaction_read_only", mode))
+		}
+		evgaService = evgaapp.NewService(evgaRepo, authService, log)
+	} else {
+		log.Info("evga: модуль выключен (EVGA_PG_DSN не задан)")
+	}
+
 	// --- HTTP (fiber) ---
 	app := httpserver.New(cfg, log)
 
@@ -150,12 +200,22 @@ func Run(cfg *config.Config) error {
 			checks["clickhouse"] = "unavailable"
 			status = fiber.StatusServiceUnavailable
 		}
+		if evgaService != nil {
+			checks["evga"] = "ok"
+			if err := evgaService.Ping(ctx); err != nil {
+				checks["evga"] = "unavailable"
+				status = fiber.StatusServiceUnavailable
+			}
+		}
 		return c.Status(status).JSON(checks)
 	})
 
 	api := app.Group("/api/v1")
 	authhttp.Register(api.Group("/auth"), authHandler)
 	reporterhttp.Register(api.Group("/reporter"), reporterHandler, reporterGuard)
+	if evgaService != nil {
+		evgahttp.Register(api.Group("/evga"), evgahttp.NewHandler(evgaService), evgahttp.NewGuard(authService))
+	}
 
 	// --- запуск + graceful shutdown ---
 	errCh := make(chan error, 1)

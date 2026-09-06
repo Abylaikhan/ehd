@@ -19,4 +19,8 @@ type Identity struct {
 type Provider interface {
 	// CurrentUser возвращает пользователя по активной сессии.
 	CurrentUser(ctx context.Context, sessionID string) (Identity, error)
+	// UserIIN возвращает расшифрованный ИИН пользователя и признак его подтверждённости.
+	// ИИН не должен попадать в логи и ответы API — только для внутрипроцессного
+	// сопоставления с внешними системами (модуль ЕВГА, спека 007 FR-3).
+	UserIIN(ctx context.Context, userID string) (iin string, verified bool, err error)
 }

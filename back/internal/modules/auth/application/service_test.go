@@ -147,6 +147,33 @@ func mustHash(t *testing.T, pw string) *string {
 	return &s
 }
 
+func TestUserIIN(t *testing.T) {
+	base := time.Unix(1_700_000_000, 0)
+	svc, users := newTestService(t, func() time.Time { return base })
+	ctx := context.Background()
+
+	// fakeCipher хранит «шифртекст» как исходные байты
+	users.byID["u1"] = &domain.User{ID: "u1", Login: "a", Status: domain.UserStatusActive, IINEnc: []byte("880101300123"), IINVerified: true}
+	users.byID["u2"] = &domain.User{ID: "u2", Login: "b", Status: domain.UserStatusActive, IINEnc: []byte("990101300123"), IINVerified: false}
+	users.byID["u3"] = &domain.User{ID: "u3", Login: "c", Status: domain.UserStatusActive, IINVerified: true} // ИИН не заполнен
+
+	iin, verified, err := svc.UserIIN(ctx, "u1")
+	if err != nil || iin != "880101300123" || !verified {
+		t.Fatalf("u1: want (880101300123, true), got (%q, %v, %v)", iin, verified, err)
+	}
+	iin, verified, err = svc.UserIIN(ctx, "u2")
+	if err != nil || iin != "990101300123" || verified {
+		t.Fatalf("u2: want (990101300123, false), got (%q, %v, %v)", iin, verified, err)
+	}
+	iin, verified, err = svc.UserIIN(ctx, "u3")
+	if err != nil || iin != "" || !verified {
+		t.Fatalf("u3: want empty iin, got (%q, %v, %v)", iin, verified, err)
+	}
+	if _, _, err = svc.UserIIN(ctx, "nope"); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("unknown user: want ErrNotFound, got %v", err)
+	}
+}
+
 func TestLoginLockoutAfterThreeFailures(t *testing.T) {
 	base := time.Unix(1_700_000_000, 0)
 	svc, users := newTestService(t, func() time.Time { return base })

@@ -14,6 +14,11 @@ func SeedReference(db *gorm.DB) error {
 		{Code: "D01", NameRu: "Подразделение 01", NameKk: "Бөлімше 01", Status: "active"},
 		{Code: "D02", NameRu: "Подразделение 02", NameKk: "Бөлімше 02", Status: "active"},
 	}
+	// Роли модуля ОБМ ЕВГА (спека 007 FR-4): назначаются администратором.
+	roles := []RoleModel{
+		{Code: "evga_auditor", NameRu: "Аудитор ДВГА (ОБМ ЕВГА)", NameKk: "ІМАД аудиторы (ОБМ ЕВГА)", Status: "active"},
+		{Code: "evga_curator", NameRu: "Куратор КВГА (ОБМ ЕВГА)", NameKk: "ІМАК кураторы (ОБМ ЕВГА)", Status: "active"},
+	}
 	return db.Transaction(func(tx *gorm.DB) error {
 		for i := range regions {
 			r := regions[i]
@@ -28,6 +33,14 @@ func SeedReference(db *gorm.DB) error {
 			if err := tx.Where(DepartmentModel{Code: d.Code}).
 				Attrs(DepartmentModel{NameRu: d.NameRu, NameKk: d.NameKk, Status: d.Status}).
 				FirstOrCreate(&departments[i]).Error; err != nil {
+				return err
+			}
+		}
+		for i := range roles {
+			r := roles[i]
+			if err := tx.Where(RoleModel{Code: r.Code}).
+				Attrs(RoleModel{NameRu: r.NameRu, NameKk: r.NameKk, Status: r.Status}).
+				FirstOrCreate(&roles[i]).Error; err != nil {
 				return err
 			}
 		}
