@@ -12,6 +12,9 @@ func Register(r fiber.Router, h *Handler, guard *Guard) {
 	user := r.Group("", guard.RequireModule)
 	user.Get("/registry", h.listRegistry)
 	user.Get("/registry/export", h.exportRegistry)
+	user.Post("/registry/status/bulk", h.bulkStatus)
 	user.Get("/registry/:id", h.getRecord)
+	user.Post("/registry/:id/status", h.changeStatus)
+	user.Get("/registry/:id/history", h.history)
 	user.Get("/references", h.references)
 }

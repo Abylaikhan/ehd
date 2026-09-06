@@ -197,3 +197,8 @@ func (s *Service) References(ctx context.Context, id contract.Identity) (Referen
 
 // Ping — readyz внешней БД (spec FR-12).
 func (s *Service) Ping(ctx context.Context) error { return s.repo.Ping(ctx) }
+
+// UserIINOf — ИИН пользователя для внутренних нужд модуля (журнал статусов, спека 008 FR-11).
+func (s *Service) UserIINOf(ctx context.Context, id contract.Identity) (string, bool, error) {
+	return s.iin.UserIIN(ctx, id.UserID)
+}
