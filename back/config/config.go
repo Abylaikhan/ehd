@@ -30,6 +30,7 @@ type Config struct {
 	Auth     Auth
 	EDS      EDS
 	Reporter Reporter
+	EVGA     EVGA
 }
 
 type App struct {
@@ -98,6 +99,15 @@ type Reporter struct {
 	SystemDBDenylist []string
 }
 
+// EVGA — модуль ОБМ ЕВГА: внешняя PostgreSQL obm_evga, строго read-only (спека 007, FR-1/2).
+// DSN необязателен: без него модуль выключен и маршруты не регистрируются.
+type EVGA struct {
+	DSN string
+}
+
+// Enabled — модуль ЕВГА включён, если задан DSN внешней БД.
+func (e EVGA) Enabled() bool { return e.DSN != "" }
+
 // New читает конфигурацию из переменных окружения через viper.
 func New() (*Config, error) {
 	v := viper.New()
@@ -152,6 +162,7 @@ func New() (*Config, error) {
 		Reporter: Reporter{
 			SystemDBDenylist: splitList(v.GetString("REPORTER_SYSTEM_DB_DENYLIST")),
 		},
+		EVGA: EVGA{DSN: v.GetString("EVGA_PG_DSN")},
 	}
 
 	// local: дефолтные ключи для удобства; в non-local обязательны.

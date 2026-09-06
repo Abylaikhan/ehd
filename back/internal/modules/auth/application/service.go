@@ -244,6 +244,23 @@ func (s *Service) CurrentUser(ctx context.Context, token string) (contract.Ident
 	}, nil
 }
 
+// UserIIN — расшифрованный ИИН пользователя для внутрипроцессного сопоставления
+// (contract.Provider; модуль ЕВГА, спека 007 FR-3). Пустой ИИН — если не заполнен.
+func (s *Service) UserIIN(ctx context.Context, userID string) (string, bool, error) {
+	u, err := s.users.GetByID(ctx, userID)
+	if err != nil {
+		return "", false, err
+	}
+	if len(u.IINEnc) == 0 {
+		return "", u.IINVerified, nil
+	}
+	iin, err := s.cipher.DecryptString(u.IINEnc)
+	if err != nil {
+		return "", false, err
+	}
+	return iin, u.IINVerified, nil
+}
+
 // --- ЭЦП (NCALayer): challenge + verify ---
 
 func (s *Service) EDSChallenge() (string, error) {
