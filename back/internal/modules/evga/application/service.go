@@ -21,6 +21,7 @@ type Repo interface {
 	Statuses(ctx context.Context) ([]domain.Reference, error)
 	Profiles(ctx context.Context) ([]domain.Reference, error)
 	Departments(ctx context.Context) ([]domain.Reference, error)
+	Activities(ctx context.Context) ([]domain.Reference, error)
 	DepartmentByUserIIN(ctx context.Context, iin string) (*int64, string, error)
 	Ping(ctx context.Context) error
 }
@@ -169,6 +170,7 @@ type References struct {
 	Statuses    []domain.Reference
 	Profiles    []domain.Reference
 	Departments []domain.Reference
+	Activities  []domain.Reference
 }
 
 func (s *Service) References(ctx context.Context, id contract.Identity) (References, error) {
@@ -184,7 +186,11 @@ func (s *Service) References(ctx context.Context, id contract.Identity) (Referen
 	if err != nil {
 		return References{}, s.wrapSourceErr(ctx, err)
 	}
-	out := References{Statuses: statuses, Profiles: profiles}
+	activities, err := s.repo.Activities(ctx)
+	if err != nil {
+		return References{}, s.wrapSourceErr(ctx, err)
+	}
+	out := References{Statuses: statuses, Profiles: profiles, Activities: activities}
 	if scope.AllDepartments {
 		deps, err := s.repo.Departments(ctx)
 		if err != nil {

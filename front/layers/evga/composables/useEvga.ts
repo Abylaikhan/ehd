@@ -1,4 +1,11 @@
-import type { EvgaCard, EvgaReferences, EvgaRegistryResponse } from '~~/shared/api/types'
+import type {
+  EvgaBulkReport,
+  EvgaCard,
+  EvgaHistoryEntry,
+  EvgaReferences,
+  EvgaRegistryResponse,
+  EvgaStatusChange,
+} from '~~/shared/api/types'
 import { filenameFromDisposition } from '../../reporter/utils/format'
 
 // Параметры реестра (backend-спека 007, FR-6/7). Пустые значения не передаются.
@@ -61,5 +68,16 @@ export function useEvga() {
     URL.revokeObjectURL(url)
   }
 
-  return { registry, card, references, exportRegistry }
+  // --- статусы (backend-спека 008) ---
+
+  const changeStatus = (id: number, body: EvgaStatusChange) =>
+    api<EvgaCard>(`/api/v1/evga/registry/${id}/status`, { method: 'POST', body })
+
+  const bulkStatus = (ids: number[], body: EvgaStatusChange) =>
+    api<EvgaBulkReport>('/api/v1/evga/registry/status/bulk', { method: 'POST', body: { ids, ...body } })
+
+  const history = (id: number) =>
+    api<{ items: EvgaHistoryEntry[] }>(`/api/v1/evga/registry/${id}/history`)
+
+  return { registry, card, references, exportRegistry, changeStatus, bulkStatus, history }
 }

@@ -284,6 +284,19 @@ func (rp *RegistryRepo) Profiles(ctx context.Context) ([]domain.Reference, error
 	return toRefs(rows), nil
 }
 
+// Activities — аудиторские мероприятия (переход в «Аудит», спека 008/006-ui).
+func (rp *RegistryRepo) Activities(ctx context.Context) ([]domain.Reference, error) {
+	var rows []refRow
+	err := rp.db.WithContext(ctx).Table("its_activity").
+		Select(`id, coalesce(code,'') as code, coalesce(title,'') as title`).
+		Where(`"in$trash" is null`).
+		Order("id").Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	return toRefs(rows), nil
+}
+
 // Departments — департаменты ДВГА (куратору/админу для фильтра).
 func (rp *RegistryRepo) Departments(ctx context.Context) ([]domain.Reference, error) {
 	var rows []refRow

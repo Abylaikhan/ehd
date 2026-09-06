@@ -242,8 +242,9 @@ func toRefsResp(in []domain.Reference) []refResp {
 
 func toReferencesResp(r application.References) fiber.Map {
 	m := fiber.Map{
-		"statuses": toRefsResp(r.Statuses),
-		"profiles": toRefsResp(r.Profiles),
+		"statuses":   toRefsResp(r.Statuses),
+		"profiles":   toRefsResp(r.Profiles),
+		"activities": toRefsResp(r.Activities),
 	}
 	if r.Departments != nil {
 		m["departments"] = toRefsResp(r.Departments)

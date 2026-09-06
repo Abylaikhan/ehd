@@ -54,6 +54,9 @@ func (f *fakeRepo) Profiles(context.Context) ([]domain.Reference, error) {
 func (f *fakeRepo) Departments(context.Context) ([]domain.Reference, error) {
 	return []domain.Reference{{ID: 5, Title: "ДВГА по X"}}, nil
 }
+func (f *fakeRepo) Activities(context.Context) ([]domain.Reference, error) {
+	return []domain.Reference{{ID: 3, Title: "Аудит 2026"}}, nil
+}
 func (f *fakeRepo) DepartmentByUserIIN(_ context.Context, iin string) (*int64, string, error) {
 	f.iinLookups++
 	if id, ok := f.deptByIIN[iin]; ok {
