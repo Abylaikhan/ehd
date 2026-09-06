@@ -331,3 +331,70 @@ export interface ColumnConfigPayload {
   width?: number
   null_label?: string
 }
+
+// --- Модуль ОБМ ЕВГА (backend-спека 007-evga-registry) ---
+
+export interface EvgaScope {
+  department_id: number | null
+  department_title?: string
+  all_departments: boolean
+  unmapped: boolean
+}
+
+export interface EvgaRecord {
+  id: number
+  ppo_pp: string
+  paymentdate: string | null
+  iin: string
+  fm: string
+  nm: string
+  ft: string
+  la1: string
+  amount_part: string
+  gu: string
+  gu_bin: string
+  sendername: string
+  god: number | null
+  mes: number | null
+  profile_id: number
+  profile_title: string
+  status_id: number | null
+  status_title: string
+  status_note: string
+  department_id: number | null
+  department_title: string
+  notice_num: string
+  out_num: string
+}
+
+export interface EvgaCard extends EvgaRecord {
+  refund: string
+  amount_for_vozvrat: string
+  activity_id: number | null
+  is_gbdfl: number | null
+  fl_fm: string
+  fl_nm: string
+  fl_ft: string
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface EvgaRegistryResponse {
+  items: EvgaRecord[]
+  total: number
+  page: number
+  page_size: number
+  scope: EvgaScope
+}
+
+export interface EvgaReference {
+  id: number
+  code?: string
+  title: string
+}
+
+export interface EvgaReferences {
+  statuses: EvgaReference[]
+  profiles: EvgaReference[]
+  departments?: EvgaReference[]
+}

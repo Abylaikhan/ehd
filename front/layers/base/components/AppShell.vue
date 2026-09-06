@@ -48,6 +48,15 @@ const sections = computed(() => {
   list.push({ title: 'Reporter', items: reporterItems })
   list.push(...menuSections)
 
+  // ОБМ ЕВГА: раздел виден по ролям модуля; backend авторизует повторно (спека 005-evga-registry-ui)
+  const roles = session.user?.roles ?? []
+  if (session.isAdmin || roles.includes('evga_auditor') || roles.includes('evga_curator')) {
+    list.push({
+      title: 'ОБМ ЕВГА',
+      items: [{ label: 'Реестр рисков 5-15а', icon: 'pi pi-exclamation-triangle', to: '/evga' }],
+    })
+  }
+
   if (session.isAdmin) {
     list.push({
       title: 'Администрирование',
