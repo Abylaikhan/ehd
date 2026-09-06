@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import type { EvgaReference, EvgaRegistryResponse } from '~~/shared/api/types'
+import type { EvgaBulkReport, EvgaRecord, EvgaReference, EvgaRegistryResponse, EvgaStatusChange } from '~~/shared/api/types'
 import type { EvgaRegistryParams } from '../../composables/useEvga'
+import { manualTargets } from '../../utils/statusFlow'
 
-// Реестр рисков 5-15а (EVGA-FR-012/013/017; спека 005-evga-registry-ui).
+// Реестр рисков 5-15а (EVGA-FR-012…015/017; спеки 005/006-evga-*-ui).
 definePageMeta({ middleware: 'auth' })
 
 const evga = useEvga()
+const session = useSessionStore()
+
+// Пишущие контролы — аудитору и админу; куратор только читает. Backend авторизует повторно.
+const canWrite = computed(() => session.isAdmin || (session.user?.roles ?? []).includes('evga_auditor'))
 
 // --- фильтры (EVGA-FR-013) ---
 const fProfile = ref<number | null>(null)
@@ -124,6 +129,41 @@ async function doExport() {
   }
 }
 
+// --- массовая простановка статуса (EVGA-FR-014/015/021…023; спека 006) ---
+const selection = ref<EvgaRecord[]>([])
+const statusDialog = ref(false)
+const statusBusy = ref(false)
+const statusError = ref('')
+const bulkReport = ref<EvgaBulkReport | null>(null)
+const reportDialog = ref(false)
+
+// bulk: целевые — все вручную назначаемые статусы; недопустимые для конкретных записей отклонит сервер с причиной
+const bulkTargets = computed<EvgaReference[]>(() => {
+  const manual = new Set(manualTargets())
+  return (refs.value?.statuses ?? []).filter((s) => manual.has(s.id))
+})
+
+function openStatusDialog() {
+  statusError.value = ''
+  statusDialog.value = true
+}
+
+async function submitBulkStatus(change: EvgaStatusChange) {
+  statusBusy.value = true
+  statusError.value = ''
+  try {
+    bulkReport.value = await evga.bulkStatus(selection.value.map((r) => r.id), change)
+    statusDialog.value = false
+    reportDialog.value = true
+    selection.value = []
+    refresh()
+  } catch (e) {
+    statusError.value = apiErrorMessage(e)
+  } finally {
+    statusBusy.value = false
+  }
+}
+
 // --- состояния экрана ---
 const errCode = computed(() => apiErrorCode(error.value))
 const screenState = computed(() => {
@@ -204,14 +244,24 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
 
           <div class="toolbar">
             <span class="count">Записей: <b>{{ total.toLocaleString('ru-RU') }}</b></span>
+            <Button
+              v-if="canWrite"
+              :label="selection.length ? `Сменить статус (${selection.length})` : 'Сменить статус'"
+              icon="pi pi-pencil"
+              severity="warn"
+              :disabled="selection.length === 0"
+              @click="openStatusDialog"
+            />
             <Button class="toolbar-export" label="Экспорт в Excel" icon="pi pi-download" :loading="exporting" :disabled="rows.length === 0" @click="doExport" />
           </div>
           <Message v-if="actionError" severity="error" :closable="true" class="action-error">{{ actionError }}</Message>
 
           <DataTable
+            v-model:selection="selection"
             :value="rows"
             :loading="pending"
             lazy
+            data-key="id"
             :sort-field="sort?.column"
             :sort-order="sort ? (sort.dir === 'asc' ? 1 : -1) : 0"
             removable-sort
@@ -224,6 +274,7 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
             <template #empty>
               <div class="empty-row">По текущему запросу строк не найдено.</div>
             </template>
+            <Column v-if="canWrite" selection-mode="multiple" :style="{ width: '2.5rem' }" />
             <Column header="№" :style="{ width: '3.5rem' }">
               <template #body="{ index }">{{ first + index + 1 }}</template>
             </Column>
@@ -269,6 +320,31 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
         </template>
       </template>
     </Card>
+
+    <EvgaStatusDialog
+      v-model:visible="statusDialog"
+      :title="`Сменить статус: выбрано ${selection.length}`"
+      :targets="bulkTargets"
+      :activities="refs?.activities ?? []"
+      :busy="statusBusy"
+      :error="statusError"
+      @submit="submitBulkStatus"
+    />
+
+    <Dialog v-model:visible="reportDialog" modal header="Результат массовой простановки" :style="{ width: '34rem' }">
+      <template v-if="bulkReport">
+        <p class="report-line">
+          Обработано: <b>{{ bulkReport.processed }}</b> · Отклонено: <b>{{ bulkReport.rejected }}</b>
+        </p>
+        <DataTable v-if="bulkReport.rejections.length" :value="bulkReport.rejections" size="small" striped-rows class="report-table">
+          <Column field="id" header="Запись" :style="{ width: '8rem' }" />
+          <Column field="reason" header="Причина отклонения" />
+        </DataTable>
+      </template>
+      <template #footer>
+        <Button label="Закрыть" @click="reportDialog = false" />
+      </template>
+    </Dialog>
   </div>
 </template>
 
@@ -290,4 +366,6 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
 .data-table { border: 1px solid var(--ehd-border); border-radius: var(--ehd-radius-sm); overflow: hidden; }
 .empty-row { padding: 1.5rem; text-align: center; color: var(--p-text-muted-color); }
 .num { text-align: right; }
+.report-line { margin: 0 0 0.75rem; font-size: 0.95rem; }
+.report-table { border: 1px solid var(--ehd-border); border-radius: var(--ehd-radius-sm); overflow: hidden; }
 </style>

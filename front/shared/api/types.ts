@@ -396,5 +396,36 @@ export interface EvgaReference {
 export interface EvgaReferences {
   statuses: EvgaReference[]
   profiles: EvgaReference[]
+  activities: EvgaReference[]
   departments?: EvgaReference[]
+}
+
+// --- ОБМ ЕВГА: статусы (backend-спека 008) ---
+
+export interface EvgaHistoryEntry {
+  id: number
+  status_from_id: number | null
+  status_from_title: string
+  status_to_id: number
+  status_to_title: string
+  note: string
+  amount_for_vozvrat: string | null
+  refund: string | null
+  changed_by_name: string
+  changed_at: string | null
+  change_source: string
+}
+
+export interface EvgaStatusChange {
+  status_id: number
+  note?: string
+  amount_for_vozvrat?: string
+  refund?: string
+  activity_id?: number | null
+}
+
+export interface EvgaBulkReport {
+  processed: number
+  rejected: number
+  rejections: { id: number; reason: string }[]
 }
