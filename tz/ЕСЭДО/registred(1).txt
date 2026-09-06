@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+ <soapenv:Body xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="id-b1c8e4aa-4140-4632-98a9-44f8092667c3">
+  <SendMessage xmlns="http://bip.bee.kz/SyncChannel/v10/Types">
+   <request xmlns="">
+    <requestInfo>
+     <messageId>3bf34324-60b5-4fbf-9bd2-a69960354d9a</messageId>
+     <correlationId/>
+     <serviceId>ESEDO_UNIVERSAL_SERVICE</serviceId>
+     <messageDate>2019-04-18T09:17:43.229Z</messageDate>
+     <routeId>R_17473199</routeId>
+     <sender>
+      <senderId>***</senderId>
+      <password>***</password>
+     </sender>
+     <sessionId/>
+    </requestInfo>
+    <requestData>
+     <data xmlns:ns1="http://esedo.nitec.kz/service/model/notification" xsi:type="ns1:stateRegistered">
+      <metadataSystem>
+       <activityId>6EF1A533-D1E3-4043-A03A-4B0D245D415E</activityId>
+       <from>6481187</from>
+       <href>e6d3381f-5e20-4225-9051-5cb5748300a1</href>
+       <performers>17473199</performers>
+       <senderOrg>6481187</senderOrg>
+      </metadataSystem>
+      <date>2019-04-18T09:10:54.000Z</date>
+      <idPortalInternal>0</idPortalInternal>
+      <regNo>1-010000-19-25814</regNo>
+      <secondSignNotifData/>
+      <userUin/>
+     </data>
+    </requestData>
+   </request>
+  </SendMessage>
+ </soapenv:Body>
+</soapenv:Envelope>

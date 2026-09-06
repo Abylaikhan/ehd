@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+ <soapenv:Body xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="id-74f5e192-ed02-4859-919d-f6e95e406ecd">
+  <SendMessage xmlns="http://bip.bee.kz/SyncChannel/v10/Types">
+   <request xmlns="">
+    <requestInfo>
+     <messageId>fd41c958-35ba-432a-919d-5e2e361615d6</messageId>
+     <correlationId/>
+     <serviceId>ESEDO_UNIVERSAL_SERVICE</serviceId>
+     <messageDate>2019-04-19T14:40:09.855Z</messageDate>
+     <routeId>R_17473143</routeId>
+     <sender>
+      <senderId>***</senderId>
+      <password>***</password>
+     </sender>
+     <sessionId/>
+    </requestInfo>
+    <requestData>
+     <data xmlns:ns1="http://esedo.nitec.kz/service/model/notification" xsi:type="ns1:stateFinished">
+      <metadataSystem>
+       <activityId>771c5e0a-b8ea-436c-9692-5cb6ad7901751</activityId>
+       <from>23917849</from>
+       <href>771c5e0a-b8ea-436c-9692-5cb6ad790175</href>
+       <performers>17473143</performers>
+       <senderOrg>2294135</senderOrg>
+      </metadataSystem>
+      <author>КИ. Жумагазиева Ж. С. дата исп: 17.04.2019 1:00:00 результат: Документ исполнения: № от Примечание:</author>
+      <idPortalInternal>0</idPortalInternal>
+      <realDate>2019-04-18T18:00:00.000Z</realDate>
+      <resultCode/>
+      <resultText/>
+      <userUin/>
+     </data>
+    </requestData>
+   </request>
+  </SendMessage>
+ </soapenv:Body>
+</soapenv:Envelope>
