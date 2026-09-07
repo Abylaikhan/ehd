@@ -45,7 +45,7 @@ type TransitionAttrs struct {
 	Note             string
 	AmountForVozvrat string // требуется при → 7; ≤ AmountPart
 	Refund           string // требуется при → 8; ≥ AmountForVozvrat записи (если та задана)
-	ActivityID       *int64 // требуется при → 12
+	ActivityID       *int64 // опционально при → 12 (ответ аналитика 07.09.2026)
 }
 
 // Ошибки переходов.
@@ -130,10 +130,9 @@ func ValidateTransition(current, target int64, attrs TransitionAttrs, recordAmou
 		if err == nil && hasPart && amount > part {
 			return condition("amount_for_vozvrat", "Сумма к возмещению не может превышать сумму записи")
 		}
-	case StatusAudit: // → 12: обязательно аудиторское мероприятие
-		if attrs.ActivityID == nil || *attrs.ActivityID <= 0 {
-			return condition("activity_id", "Для перевода в «Аудит» обязательно аудиторское мероприятие")
-		}
+	case StatusAudit:
+		// → 12: по ответу аналитика 07.09.2026 мероприятие НЕ обязательно
+		// («если ставят Аудит — ничего не происходит»); activity_id принимается опционально.
 	case StatusRefunded: // → 8: обязателен refund; если меньше суммы к возмещению — отказ (AT-05)
 		refund, has, err := parseAmount(attrs.Refund)
 		if err != nil || !has || refund <= 0 {

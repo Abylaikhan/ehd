@@ -26,13 +26,16 @@ export function manualTargets(): number[] {
   return [...set].sort((a, b) => a - b)
 }
 
-/** Какие поля обязательны для перехода в целевой статус. */
-export function requiredFields(target: number | null): { note: boolean; amount: boolean; refund: boolean; activity: boolean } {
+/** Какие поля обязательны для перехода в целевой статус.
+ * «Аудит» (12) по ответу аналитика 07.09.2026 обязательных полей не имеет —
+ * мероприятие показывается опционально (showActivity). */
+export function requiredFields(target: number | null): { note: boolean; amount: boolean; refund: boolean; activity: boolean; showActivity: boolean } {
   return {
     note: target === 2,
     amount: target === 7,
     refund: target === 8,
-    activity: target === 12,
+    activity: false,
+    showActivity: target === 12,
   }
 }
 
@@ -46,6 +49,5 @@ export function validateForm(
   if (req.note && !form.note.trim()) return 'Укажите комментарий — для «Не подтверждено» он обязателен'
   if (req.amount && !(parseFloat(form.amount) > 0)) return 'Укажите сумму к возмещению'
   if (req.refund && !(parseFloat(form.refund) > 0)) return 'Укажите сумму возмещения'
-  if (req.activity && !form.activityId) return 'Выберите аудиторское мероприятие'
   return null
 }

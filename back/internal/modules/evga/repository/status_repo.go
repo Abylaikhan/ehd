@@ -104,7 +104,7 @@ func (sr *StatusRepo) ApplyStatusChange(
 			if targetStatus == domain.StatusRefunded {
 				updates["refund"] = strings.TrimSpace(attrs.Refund)
 			}
-			if targetStatus == domain.StatusAudit {
+			if targetStatus == domain.StatusAudit && attrs.ActivityID != nil {
 				updates["its_activity_id"] = *attrs.ActivityID
 			}
 			if changedBy != nil {
