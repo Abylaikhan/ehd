@@ -24,8 +24,10 @@ describe('statusFlow', () => {
     expect(requiredFields(2).note).toBe(true)
     expect(requiredFields(7).amount).toBe(true)
     expect(requiredFields(8).refund).toBe(true)
-    expect(requiredFields(12).activity).toBe(true)
-    expect(requiredFields(6)).toEqual({ note: false, amount: false, refund: false, activity: false })
+    // «Аудит»: мероприятие опционально (ответ аналитика 07.09.2026)
+    expect(requiredFields(12).activity).toBe(false)
+    expect(requiredFields(12).showActivity).toBe(true)
+    expect(requiredFields(6)).toEqual({ note: false, amount: false, refund: false, activity: false, showActivity: false })
   })
 
   it('валидация формы', () => {
@@ -36,8 +38,7 @@ describe('statusFlow', () => {
     expect(validateForm(7, empty)).toContain('сумму к возмещению')
     expect(validateForm(7, { ...empty, amount: '100.50' })).toBeNull()
     expect(validateForm(8, empty)).toContain('сумму возмещения')
-    expect(validateForm(12, empty)).toContain('мероприятие')
-    expect(validateForm(12, { ...empty, activityId: 3 })).toBeNull()
+    expect(validateForm(12, empty)).toBeNull() // «Аудит» — без обязательных полей
     expect(validateForm(6, empty)).toBeNull()
   })
 })

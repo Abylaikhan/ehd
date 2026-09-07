@@ -91,10 +91,12 @@ func TestConditionAmountForVozvrat(t *testing.T) {
 	}
 }
 
-func TestConditionActivityForAudit(t *testing.T) {
-	if err := ValidateTransition(11, 12, TransitionAttrs{}, "", ""); !errors.Is(err, ErrTransitionCondition) {
-		t.Fatalf("без мероприятия: %v", err)
+func TestAuditNoConditions(t *testing.T) {
+	// ответ аналитика 07.09.2026: переход в «Аудит» не требует атрибутов
+	if err := ValidateTransition(11, 12, TransitionAttrs{}, "", ""); err != nil {
+		t.Fatalf("11→12 без атрибутов должен проходить: %v", err)
 	}
+	// мероприятие опционально принимается
 	if err := ValidateTransition(7, 12, TransitionAttrs{ActivityID: ptr(int64(3))}, "", "100.00"); err != nil {
 		t.Fatalf("с мероприятием: %v", err)
 	}

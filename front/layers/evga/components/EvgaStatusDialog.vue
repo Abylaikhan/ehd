@@ -57,7 +57,7 @@ function submit() {
   if (note.value.trim()) change.note = note.value.trim()
   if (req.value.amount) change.amount_for_vozvrat = amount.value
   if (req.value.refund) change.refund = refund.value
-  if (req.value.activity) change.activity_id = activityId.value
+  if (req.value.showActivity && activityId.value) change.activity_id = activityId.value
   emit('submit', change)
 }
 </script>
@@ -91,9 +91,9 @@ function submit() {
         <InputText v-model="refund" placeholder="Например 100000.00" inputmode="decimal" />
       </label>
 
-      <label v-if="req.activity" class="field">
-        <span>Аудиторское мероприятие <b class="req">*</b></span>
-        <Select v-model="activityId" :options="activityOptions" option-label="label" option-value="value" placeholder="Выберите мероприятие" filter />
+      <label v-if="req.showActivity" class="field">
+        <span>Аудиторское мероприятие (необязательно)</span>
+        <Select v-model="activityId" :options="activityOptions" option-label="label" option-value="value" placeholder="Выберите мероприятие" filter show-clear />
       </label>
 
       <Message v-if="localError || error" severity="error" :closable="false">{{ localError || error }}</Message>
