@@ -148,6 +148,13 @@ function openStatusDialog() {
   statusDialog.value = true
 }
 
+// --- формирование уведомления (EVGA-FR-016; спека 007-evga-notices-ui) ---
+const noticeDraft = useEvgaNoticeDraft()
+function goCreateNotice() {
+  noticeDraft.value = selection.value.map((r) => r.id)
+  navigateTo('/evga/notices/create')
+}
+
 async function submitBulkStatus(change: EvgaStatusChange) {
   statusBusy.value = true
   statusError.value = ''
@@ -251,6 +258,13 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
               severity="warn"
               :disabled="selection.length === 0"
               @click="openStatusDialog"
+            />
+            <Button
+              v-if="canWrite"
+              :label="selection.length ? `Сформировать уведомление (${selection.length})` : 'Сформировать уведомление'"
+              icon="pi pi-envelope"
+              :disabled="selection.length === 0"
+              @click="goCreateNotice"
             />
             <Button class="toolbar-export" label="Экспорт в Excel" icon="pi pi-download" :loading="exporting" :disabled="rows.length === 0" @click="doExport" />
           </div>

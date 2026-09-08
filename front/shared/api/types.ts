@@ -429,3 +429,91 @@ export interface EvgaBulkReport {
   rejected: number
   rejections: { id: number; reason: string }[]
 }
+
+// --- ОБМ ЕВГА: формирование уведомлений (backend-спека 009) ---
+
+export interface EvgaGroupRecord {
+  id: number
+  ppo_pp: string
+  paymentdate: string | null
+  iin: string
+  fio: string
+  amount_part: string
+}
+
+export interface EvgaNoticeGroup {
+  gu: string
+  gu_bin: string
+  sendername: string
+  count: number
+  total_sum: string
+  records: EvgaGroupRecord[]
+}
+
+export interface EvgaNoticeRejected {
+  id: number
+  code: string
+  reason: string
+  notice_num?: string
+}
+
+export interface EvgaNoticePreview {
+  groups: EvgaNoticeGroup[]
+  rejected: EvgaNoticeRejected[]
+}
+
+export interface EvgaCliOrg {
+  id: number
+  code: string
+  bin_iin: string
+  title: string
+}
+
+export interface EvgaNoticeCreateResult {
+  created: { notice_id: number; gu: string; records: number }[]
+  rejected: EvgaNoticeRejected[]
+}
+
+export interface EvgaNoticeListItem {
+  id: number
+  docnum: string
+  status_id: number | null
+  status_title: string
+  gu: string
+  sendername: string
+  recipient: string
+  rows_count: number
+  total_sum: string
+  created_at: string | null
+  department: string
+}
+
+export interface EvgaNoticeRow {
+  id: number
+  tb_5_15a_id: number | null
+  ppo_pp: string
+  paymentdate: string | null
+  iin: string
+  fm: string
+  nm: string
+  ft: string
+  la1: string
+  amount_part: string
+  gu: string
+  gu_bin: string
+  sendername: string
+}
+
+export interface EvgaNoticeCard {
+  header: EvgaNoticeListItem
+  notice_txt: string
+  rows: EvgaNoticeRow[]
+}
+
+export interface EvgaNoticeListResponse {
+  items: EvgaNoticeListItem[]
+  total: number
+  page: number
+  page_size: number
+  scope: EvgaScope
+}
