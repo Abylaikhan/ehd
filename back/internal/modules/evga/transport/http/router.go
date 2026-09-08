@@ -17,4 +17,12 @@ func Register(r fiber.Router, h *Handler, guard *Guard) {
 	user.Post("/registry/:id/status", h.changeStatus)
 	user.Get("/registry/:id/history", h.history)
 	user.Get("/references", h.references)
+
+	// уведомления (спека 009); порядок: preview раньше :id
+	user.Post("/notices/preview", h.noticePreview)
+	user.Post("/notices", h.noticeCreate)
+	user.Get("/notices", h.noticeList)
+	user.Get("/notices/:id", h.noticeGet)
+	user.Delete("/notices/:id", h.noticeDelete)
+	user.Get("/cli", h.cliSearch)
 }
