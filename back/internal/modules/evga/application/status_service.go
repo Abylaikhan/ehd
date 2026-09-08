@@ -22,7 +22,7 @@ const MaxBulkIDs = 1000
 
 // StatusRepoPort — порт репозитория статусов.
 type StatusRepoPort interface {
-	ApplyStatusChange(ctx context.Context, ids []int64, targetStatus int64, attrs domain.TransitionAttrs, deptID *int64, changedBy *int64, source string) ([]repository.ChangeOutcome, error)
+	ApplyStatusChange(ctx context.Context, ids []int64, targetStatus int64, attrs domain.TransitionAttrs, deptID *int64, changedBy *int64, source string) ([]repository.ChangeOutcome, int, error)
 	History(ctx context.Context, recordID int64) ([]repository.HistoryEntry, error)
 	UserIDByIIN(ctx context.Context, iin string) (*int64, error)
 }
@@ -49,6 +49,7 @@ func NewStatusService(repo StatusRepoPort, scopes ScopeProvider, writeEnabled bo
 type BulkReport struct {
 	Processed  int
 	Rejected   int
+	Cascaded   int // каскадно обновлённые записи того же платежа (FR-14)
 	Rejections []Rejection
 }
 
@@ -97,7 +98,7 @@ func (s *StatusService) ChangeStatus(ctx context.Context, id contract.Identity, 
 	if err != nil {
 		return err
 	}
-	outcomes, err := s.repo.ApplyStatusChange(ctx, []int64{recordID}, target, attrs, deptID, changedBy, domain.ChangeSourceManual)
+	outcomes, cascaded, err := s.repo.ApplyStatusChange(ctx, []int64{recordID}, target, attrs, deptID, changedBy, domain.ChangeSourceManual)
 	if err != nil {
 		return err
 	}
@@ -105,7 +106,8 @@ func (s *StatusService) ChangeStatus(ctx context.Context, id contract.Identity, 
 		return outcomes[0].Err
 	}
 	s.log.Info("evga: status changed",
-		zap.Int64("record_id", recordID), zap.Int64("to", target), zap.String("user_id", id.UserID))
+		zap.Int64("record_id", recordID), zap.Int64("to", target),
+		zap.Int("cascaded", cascaded), zap.String("user_id", id.UserID))
 	return nil
 }
 
@@ -118,11 +120,11 @@ func (s *StatusService) BulkChangeStatus(ctx context.Context, id contract.Identi
 	if err != nil {
 		return BulkReport{}, err
 	}
-	outcomes, err := s.repo.ApplyStatusChange(ctx, ids, target, attrs, deptID, changedBy, domain.ChangeSourceBulk)
+	outcomes, cascaded, err := s.repo.ApplyStatusChange(ctx, ids, target, attrs, deptID, changedBy, domain.ChangeSourceBulk)
 	if err != nil {
 		return BulkReport{}, err
 	}
-	rep := BulkReport{}
+	rep := BulkReport{Cascaded: cascaded}
 	for _, o := range outcomes {
 		if o.Err == nil {
 			rep.Processed++

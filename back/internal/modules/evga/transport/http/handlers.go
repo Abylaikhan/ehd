@@ -202,6 +202,7 @@ func (h *Handler) bulkStatus(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"processed":  rep.Processed,
 		"rejected":   rep.Rejected,
+		"cascaded":   rep.Cascaded,
 		"rejections": rejections,
 	})
 }
