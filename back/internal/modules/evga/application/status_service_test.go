@@ -23,19 +23,19 @@ type fakeStatusRepo struct {
 	userByIIN  map[string]int64
 }
 
-func (f *fakeStatusRepo) ApplyStatusChange(_ context.Context, ids []int64, _ int64, _ domain.TransitionAttrs, deptID *int64, changedBy *int64, source string) ([]repository.ChangeOutcome, error) {
+func (f *fakeStatusRepo) ApplyStatusChange(_ context.Context, ids []int64, _ int64, _ domain.TransitionAttrs, deptID *int64, changedBy *int64, source string) ([]repository.ChangeOutcome, int, error) {
 	f.lastIDs = ids
 	f.lastDept = deptID
 	f.lastBy = changedBy
 	f.lastSource = source
 	if f.outcomes != nil {
-		return f.outcomes, nil
+		return f.outcomes, 0, nil
 	}
 	out := make([]repository.ChangeOutcome, len(ids))
 	for i, id := range ids {
 		out[i] = repository.ChangeOutcome{ID: id}
 	}
-	return out, nil
+	return out, 0, nil
 }
 func (f *fakeStatusRepo) History(context.Context, int64) ([]repository.HistoryEntry, error) {
 	return []repository.HistoryEntry{}, nil

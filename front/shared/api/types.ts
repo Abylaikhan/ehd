@@ -427,6 +427,8 @@ export interface EvgaStatusChange {
 export interface EvgaBulkReport {
   processed: number
   rejected: number
+  /** Каскадно обновлённые записи того же платежа по другим профилям (FR-14). */
+  cascaded: number
   rejections: { id: number; reason: string }[]
 }
 

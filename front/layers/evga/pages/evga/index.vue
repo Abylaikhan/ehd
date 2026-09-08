@@ -349,6 +349,7 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
       <template v-if="bulkReport">
         <p class="report-line">
           Обработано: <b>{{ bulkReport.processed }}</b> · Отклонено: <b>{{ bulkReport.rejected }}</b>
+          <span v-if="bulkReport.cascaded"> · Обновлено по тому же платежу (другие профили): <b>{{ bulkReport.cascaded }}</b></span>
         </p>
         <DataTable v-if="bulkReport.rejections.length" :value="bulkReport.rejections" size="small" striped-rows class="report-table">
           <Column field="id" header="Запись" :style="{ width: '8rem' }" />

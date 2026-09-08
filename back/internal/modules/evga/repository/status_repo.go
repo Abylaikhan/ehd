@@ -32,9 +32,49 @@ type ChangeOutcome struct {
 // lockedRow — заблокированная строка витрины с данными для валидации перехода.
 type lockedRow struct {
 	ID               int64
+	PpoPp            string
 	StatusID         *int64
 	AmountPart       string
 	AmountForVozvrat *string
+}
+
+// applyOne — UPDATE полей отработки + строка журнала для одной записи (FR-10/11).
+// Валидация перехода выполняется вызывающей стороной.
+func applyOne(tx *gorm.DB, row lockedRow, targetStatus int64, attrs domain.TransitionAttrs, changedBy *int64, source string) error {
+	updates := map[string]any{
+		"its_risk_status_id": targetStatus,
+		"updated_at":         time.Now(),
+	}
+	logRow := map[string]any{
+		"tb_5_15a_id":    row.ID,
+		"status_from_id": row.StatusID,
+		"status_to_id":   targetStatus,
+		"change_source":  source,
+		"changed_at":     time.Now(),
+	}
+	if note := strings.TrimSpace(attrs.Note); note != "" {
+		updates["risk_status_note"] = note
+		logRow["note"] = note
+	}
+	if targetStatus == domain.StatusRefundDue {
+		updates["amount_for_vozvrat"] = strings.TrimSpace(attrs.AmountForVozvrat)
+		logRow["amount_for_vozvrat"] = strings.TrimSpace(attrs.AmountForVozvrat)
+	}
+	if targetStatus == domain.StatusRefunded {
+		updates["refund"] = strings.TrimSpace(attrs.Refund)
+		logRow["refund"] = strings.TrimSpace(attrs.Refund)
+	}
+	if targetStatus == domain.StatusAudit && attrs.ActivityID != nil {
+		updates["its_activity_id"] = *attrs.ActivityID
+	}
+	if changedBy != nil {
+		updates["updated_by"] = *changedBy
+		logRow["changed_by"] = *changedBy
+	}
+	if err := tx.Table("its_tb_5_15a").Where("id = ?", row.ID).Updates(updates).Error; err != nil {
+		return err
+	}
+	return tx.Table("its_tb_5_15a_status_log").Create(logRow).Error
 }
 
 // ApplyStatusChange выполняет переходы записей ids → targetStatus в ОДНОЙ транзакции
@@ -49,13 +89,14 @@ func (sr *StatusRepo) ApplyStatusChange(
 	deptID *int64,
 	changedBy *int64,
 	source string,
-) ([]ChangeOutcome, error) {
+) ([]ChangeOutcome, int, error) {
 	outcomes := make([]ChangeOutcome, 0, len(ids))
+	cascaded := 0
 
 	err := sr.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// блокировка строк: одновременные аудиторы не потеряют обновления (FR-9)
 		q := tx.Table("its_tb_5_15a").
-			Select(`id, its_risk_status_id as status_id, amount_part::text as amount_part, amount_for_vozvrat::text as amount_for_vozvrat`).
+			Select(`id, coalesce(ppo_pp,'') as ppo_pp, its_risk_status_id as status_id, amount_part::text as amount_part, amount_for_vozvrat::text as amount_for_vozvrat`).
 			Where(`id in ? and "in$trash" is null`, ids)
 		if deptID != nil {
 			q = q.Where("its_departments_id = ?", *deptID)
@@ -70,6 +111,7 @@ func (sr *StatusRepo) ApplyStatusChange(
 			byID[r.ID] = r
 		}
 
+		changedPpo := map[string]bool{}
 		for _, id := range ids {
 			row, ok := byID[id]
 			if !ok {
@@ -77,74 +119,65 @@ func (sr *StatusRepo) ApplyStatusChange(
 					Reason: "Запись не найдена или относится к другому департаменту"})
 				continue
 			}
-			current := int64(0)
-			if row.StatusID != nil {
-				current = *row.StatusID
-			}
-			curVozvrat := ""
-			if row.AmountForVozvrat != nil {
-				curVozvrat = *row.AmountForVozvrat
-			}
-			if err := domain.ValidateTransition(current, targetStatus, attrs, row.AmountPart, curVozvrat); err != nil {
+			if err := validateRow(row, targetStatus, attrs); err != nil {
 				outcomes = append(outcomes, ChangeOutcome{ID: id, Err: err, Reason: err.Error()})
 				continue
 			}
-
-			// UPDATE только полей отработки (EVGA-FR-019, спека 008 FR-2/10)
-			updates := map[string]any{
-				"its_risk_status_id": targetStatus,
-				"updated_at":         time.Now(),
-			}
-			if strings.TrimSpace(attrs.Note) != "" {
-				updates["risk_status_note"] = strings.TrimSpace(attrs.Note)
-			}
-			if targetStatus == domain.StatusRefundDue {
-				updates["amount_for_vozvrat"] = strings.TrimSpace(attrs.AmountForVozvrat)
-			}
-			if targetStatus == domain.StatusRefunded {
-				updates["refund"] = strings.TrimSpace(attrs.Refund)
-			}
-			if targetStatus == domain.StatusAudit && attrs.ActivityID != nil {
-				updates["its_activity_id"] = *attrs.ActivityID
-			}
-			if changedBy != nil {
-				updates["updated_by"] = *changedBy
-			}
-			if err := tx.Table("its_tb_5_15a").Where("id = ?", id).Updates(updates).Error; err != nil {
+			if err := applyOne(tx, row, targetStatus, attrs, changedBy, source); err != nil {
 				return err
 			}
-
-			// журнал — при каждом изменении (EVGA-BR-015, FR-11)
-			logRow := map[string]any{
-				"tb_5_15a_id":    id,
-				"status_from_id": row.StatusID,
-				"status_to_id":   targetStatus,
-				"change_source":  source,
-				"changed_at":     time.Now(),
-			}
-			if strings.TrimSpace(attrs.Note) != "" {
-				logRow["note"] = strings.TrimSpace(attrs.Note)
-			}
-			if targetStatus == domain.StatusRefundDue {
-				logRow["amount_for_vozvrat"] = strings.TrimSpace(attrs.AmountForVozvrat)
-			}
-			if targetStatus == domain.StatusRefunded {
-				logRow["refund"] = strings.TrimSpace(attrs.Refund)
-			}
-			if changedBy != nil {
-				logRow["changed_by"] = *changedBy
-			}
-			if err := tx.Table("its_tb_5_15a_status_log").Create(logRow).Error; err != nil {
-				return err
+			if row.PpoPp != "" {
+				changedPpo[row.PpoPp] = true
 			}
 			outcomes = append(outcomes, ChangeOutcome{ID: id})
+		}
+
+		// каскад по платежу (спека 008 FR-14, ответ №3-1): та же смена применяется
+		// к записям того же ppo_pp других профилей, если их переход допустим;
+		// департамент не фильтруется — записи одного платежа принадлежат одному ДВГА.
+		if len(changedPpo) > 0 && source != domain.ChangeSourceSystem {
+			ppoList := make([]string, 0, len(changedPpo))
+			for p := range changedPpo {
+				ppoList = append(ppoList, p)
+			}
+			var siblings []lockedRow
+			err := tx.Table("its_tb_5_15a").
+				Select(`id, coalesce(ppo_pp,'') as ppo_pp, its_risk_status_id as status_id, amount_part::text as amount_part, amount_for_vozvrat::text as amount_for_vozvrat`).
+				Where(`ppo_pp in ? and id not in ? and "in$trash" is null`, ppoList, ids).
+				Clauses(forUpdate()).
+				Scan(&siblings).Error
+			if err != nil {
+				return err
+			}
+			for _, sib := range siblings {
+				if validateRow(sib, targetStatus, attrs) != nil {
+					continue // недопустимый переход соседа — не трогаем («старые записи не трогает»)
+				}
+				if err := applyOne(tx, sib, targetStatus, attrs, changedBy, domain.ChangeSourceSystem); err != nil {
+					return err
+				}
+				cascaded++
+			}
 		}
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return outcomes, nil
+	return outcomes, cascaded, nil
+}
+
+// validateRow — валидация перехода для строки с раскрытием NULL-полей.
+func validateRow(row lockedRow, targetStatus int64, attrs domain.TransitionAttrs) error {
+	current := int64(0)
+	if row.StatusID != nil {
+		current = *row.StatusID
+	}
+	curVozvrat := ""
+	if row.AmountForVozvrat != nil {
+		curVozvrat = *row.AmountForVozvrat
+	}
+	return domain.ValidateTransition(current, targetStatus, attrs, row.AmountPart, curVozvrat)
 }
 
 // HistoryEntry — строка истории статусов записи (FR-12).
