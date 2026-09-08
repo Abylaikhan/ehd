@@ -15,13 +15,14 @@ import (
 
 // Handler — HTTP-обработчики модуля ЕВГА.
 type Handler struct {
-	svc     *application.Service
-	status  *application.StatusService
-	notices *application.NoticeService
+	svc      *application.Service
+	status   *application.StatusService
+	notices  *application.NoticeService
+	approval *application.ApprovalService
 }
 
-func NewHandler(svc *application.Service, status *application.StatusService, notices *application.NoticeService) *Handler {
-	return &Handler{svc: svc, status: status, notices: notices}
+func NewHandler(svc *application.Service, status *application.StatusService, notices *application.NoticeService, approval *application.ApprovalService) *Handler {
+	return &Handler{svc: svc, status: status, notices: notices, approval: approval}
 }
 
 // mapErr — доменные ошибки → единый контракт ошибок (спеки 007/008).
