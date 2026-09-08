@@ -152,6 +152,7 @@ func Run(cfg *config.Config) error {
 	var evgaService *evgaapp.Service
 	var evgaStatusService *evgaapp.StatusService
 	var evgaNoticeService *evgaapp.NoticeService
+	var evgaApprovalService *evgaapp.ApprovalService
 	if cfg.EVGA.Enabled() {
 		evgaDSN := cfg.EVGA.DSN
 		if !cfg.EVGA.WriteEnabled {
@@ -186,6 +187,14 @@ func Run(cfg *config.Config) error {
 		evgaStatusService = evgaapp.NewStatusService(evgaStatusRepo, evgaService, cfg.EVGA.WriteEnabled, log)
 		evgaNoticeService = evgaapp.NewNoticeService(
 			evgarepo.NewNoticeRepo(evgaDB), evgaStatusRepo, evgaService, cfg.EVGA.WriteEnabled, log)
+
+		// маршрут согласования живёт в БД ЕХД (спека 010 ADR), не в obm_evga
+		if err := evgarepo.MigrateRoute(db); err != nil {
+			return err
+		}
+		evgaApprovalService = evgaapp.NewApprovalService(
+			evgarepo.NewApprovalRepo(evgaDB), evgarepo.NewRouteRepo(db),
+			evgaStatusRepo, evgaService, cfg.EVGA.WriteEnabled, log)
 	} else {
 		log.Info("evga: модуль выключен (EVGA_PG_DSN не задан)")
 	}
@@ -226,7 +235,7 @@ func Run(cfg *config.Config) error {
 	reporterhttp.Register(api.Group("/reporter"), reporterHandler, reporterGuard)
 	if evgaService != nil {
 		evgahttp.Register(api.Group("/evga"),
-			evgahttp.NewHandler(evgaService, evgaStatusService, evgaNoticeService),
+			evgahttp.NewHandler(evgaService, evgaStatusService, evgaNoticeService, evgaApprovalService),
 			evgahttp.NewGuard(authService))
 	}
 

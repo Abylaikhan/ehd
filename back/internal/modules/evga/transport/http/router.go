@@ -25,4 +25,12 @@ func Register(r fiber.Router, h *Handler, guard *Guard) {
 	user.Get("/notices/:id", h.noticeGet)
 	user.Delete("/notices/:id", h.noticeDelete)
 	user.Get("/cli", h.cliSearch)
+
+	// согласование и маршрут (спека 010)
+	user.Get("/notices/:id/route", h.routeGet)
+	user.Put("/notices/:id/route", h.routePut)
+	user.Get("/notices/:id/participants", h.deptUsers)
+	user.Post("/notices/:id/submit", h.noticeSubmit)
+	user.Post("/notices/:id/approve", h.noticeApprove)
+	user.Post("/notices/:id/reject", h.noticeReject)
 }
