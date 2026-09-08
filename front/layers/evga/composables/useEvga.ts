@@ -7,7 +7,9 @@ import type {
   EvgaNoticeCreateResult,
   EvgaNoticeListResponse,
   EvgaNoticePreview,
+  EvgaParticipant,
   EvgaReferences,
+  EvgaRouteView,
   EvgaRegistryResponse,
   EvgaStatusChange,
 } from '~~/shared/api/types'
@@ -103,9 +105,33 @@ export function useEvga() {
   const cliSearch = (q: string) =>
     api<{ items: EvgaCliOrg[] }>('/api/v1/evga/cli', { query: { q } })
 
+  // --- согласование (backend-спека 010) ---
+
+  const routeGet = (noticeId: number) =>
+    api<EvgaRouteView>(`/api/v1/evga/notices/${noticeId}/route`)
+
+  const routePut = (noticeId: number, approverIds: number[], outgoingUserId: number) =>
+    api<EvgaRouteView>(`/api/v1/evga/notices/${noticeId}/route`, {
+      method: 'PUT',
+      body: { approver_ids: approverIds, outgoing_user_id: outgoingUserId },
+    })
+
+  const participants = (noticeId: number, q: string) =>
+    api<{ items: EvgaParticipant[] }>(`/api/v1/evga/notices/${noticeId}/participants`, { query: { q } })
+
+  const noticeSubmit = (noticeId: number) =>
+    api<{ docnum: string; status_id: number }>(`/api/v1/evga/notices/${noticeId}/submit`, { method: 'POST' })
+
+  const noticeApprove = (noticeId: number, comment?: string) =>
+    api<{ approved: boolean }>(`/api/v1/evga/notices/${noticeId}/approve`, { method: 'POST', body: { comment } })
+
+  const noticeReject = (noticeId: number, comment: string) =>
+    api<{ rejected: boolean }>(`/api/v1/evga/notices/${noticeId}/reject`, { method: 'POST', body: { comment } })
+
   return {
     registry, card, references, exportRegistry, changeStatus, bulkStatus, history,
     noticePreview, noticeCreate, noticeList, noticeGet, noticeDelete, cliSearch,
+    routeGet, routePut, participants, noticeSubmit, noticeApprove, noticeReject,
   }
 }
 

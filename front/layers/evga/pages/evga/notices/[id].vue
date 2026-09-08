@@ -111,6 +111,14 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
         </template>
       </Card>
 
+      <EvgaRouteCard
+        :notice-id="id"
+        :status-id="header?.status_id ?? null"
+        :can-write="canWrite"
+        class="mb"
+        @changed="refresh"
+      />
+
       <Card>
         <template #title>Приложение — записи витрины ({{ card.rows.length }})</template>
         <template #content>

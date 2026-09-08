@@ -519,3 +519,31 @@ export interface EvgaNoticeListResponse {
   page_size: number
   scope: EvgaScope
 }
+
+// --- ОБМ ЕВГА: согласование (backend-спека 010) ---
+
+export interface EvgaRouteStep {
+  id: number
+  round: number
+  step_nn: number
+  kind: 'approve' | 'outgoing'
+  assignee_id: number
+  assignee_name: string
+  status: 'draft' | 'open' | 'done'
+  result: string
+  comment: string
+  opened_at: string | null
+  closed_at: string | null
+}
+
+export interface EvgaRouteView {
+  editable: boolean
+  template: EvgaRouteStep[]
+  history: EvgaRouteStep[]
+}
+
+export interface EvgaParticipant {
+  id: number
+  name: string
+  login: string
+}
