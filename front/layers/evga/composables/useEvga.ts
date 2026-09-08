@@ -1,7 +1,12 @@
 import type {
   EvgaBulkReport,
   EvgaCard,
+  EvgaCliOrg,
   EvgaHistoryEntry,
+  EvgaNoticeCard,
+  EvgaNoticeCreateResult,
+  EvgaNoticeListResponse,
+  EvgaNoticePreview,
   EvgaReferences,
   EvgaRegistryResponse,
   EvgaStatusChange,
@@ -79,5 +84,30 @@ export function useEvga() {
   const history = (id: number) =>
     api<{ items: EvgaHistoryEntry[] }>(`/api/v1/evga/registry/${id}/history`)
 
-  return { registry, card, references, exportRegistry, changeStatus, bulkStatus, history }
+  // --- уведомления (backend-спека 009) ---
+
+  const noticePreview = (ids: number[]) =>
+    api<EvgaNoticePreview>('/api/v1/evga/notices/preview', { method: 'POST', body: { ids } })
+
+  const noticeCreate = (groups: { record_ids: number[]; its_cli_id: number }[]) =>
+    api<EvgaNoticeCreateResult>('/api/v1/evga/notices', { method: 'POST', body: { groups } })
+
+  const noticeList = (p: { page?: number; page_size?: number; status_id?: number | null; docnum?: string; department_id?: number | null }) =>
+    api<EvgaNoticeListResponse>('/api/v1/evga/notices', { query: toQuery(p as EvgaRegistryParams) })
+
+  const noticeGet = (id: number) => api<EvgaNoticeCard>(`/api/v1/evga/notices/${id}`)
+
+  const noticeDelete = (id: number) =>
+    api<{ deleted: boolean }>(`/api/v1/evga/notices/${id}`, { method: 'DELETE' })
+
+  const cliSearch = (q: string) =>
+    api<{ items: EvgaCliOrg[] }>('/api/v1/evga/cli', { query: { q } })
+
+  return {
+    registry, card, references, exportRegistry, changeStatus, bulkStatus, history,
+    noticePreview, noticeCreate, noticeList, noticeGet, noticeDelete, cliSearch,
+  }
 }
+
+// Черновик формирования: выбранные в реестре записи (передача между страницами).
+export const useEvgaNoticeDraft = () => useState<number[]>('evga-notice-draft', () => [])

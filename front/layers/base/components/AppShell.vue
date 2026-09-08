@@ -53,7 +53,10 @@ const sections = computed(() => {
   if (session.isAdmin || roles.includes('evga_auditor') || roles.includes('evga_curator')) {
     list.push({
       title: 'ОБМ ЕВГА',
-      items: [{ label: 'Реестр рисков 5-15а', icon: 'pi pi-exclamation-triangle', to: '/evga' }],
+      items: [
+        { label: 'Реестр рисков 5-15а', icon: 'pi pi-exclamation-triangle', to: '/evga' },
+        { label: 'Уведомления', icon: 'pi pi-envelope', to: '/evga/notices' },
+      ],
     })
   }
 
