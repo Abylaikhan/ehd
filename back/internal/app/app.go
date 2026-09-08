@@ -151,6 +151,7 @@ func Run(cfg *config.Config) error {
 	// --- Модуль ОБМ ЕВГА (внешняя PostgreSQL obm_evga; спека 007, режим записи — спека 008 FR-1/2) ---
 	var evgaService *evgaapp.Service
 	var evgaStatusService *evgaapp.StatusService
+	var evgaNoticeService *evgaapp.NoticeService
 	if cfg.EVGA.Enabled() {
 		evgaDSN := cfg.EVGA.DSN
 		if !cfg.EVGA.WriteEnabled {
@@ -181,8 +182,10 @@ func Run(cfg *config.Config) error {
 				zap.Bool("write_enabled", cfg.EVGA.WriteEnabled))
 		}
 		evgaService = evgaapp.NewService(evgaRepo, authService, log)
-		evgaStatusService = evgaapp.NewStatusService(
-			evgarepo.NewStatusRepo(evgaDB), evgaService, cfg.EVGA.WriteEnabled, log)
+		evgaStatusRepo := evgarepo.NewStatusRepo(evgaDB)
+		evgaStatusService = evgaapp.NewStatusService(evgaStatusRepo, evgaService, cfg.EVGA.WriteEnabled, log)
+		evgaNoticeService = evgaapp.NewNoticeService(
+			evgarepo.NewNoticeRepo(evgaDB), evgaStatusRepo, evgaService, cfg.EVGA.WriteEnabled, log)
 	} else {
 		log.Info("evga: модуль выключен (EVGA_PG_DSN не задан)")
 	}
@@ -222,7 +225,9 @@ func Run(cfg *config.Config) error {
 	authhttp.Register(api.Group("/auth"), authHandler)
 	reporterhttp.Register(api.Group("/reporter"), reporterHandler, reporterGuard)
 	if evgaService != nil {
-		evgahttp.Register(api.Group("/evga"), evgahttp.NewHandler(evgaService, evgaStatusService), evgahttp.NewGuard(authService))
+		evgahttp.Register(api.Group("/evga"),
+			evgahttp.NewHandler(evgaService, evgaStatusService, evgaNoticeService),
+			evgahttp.NewGuard(authService))
 	}
 
 	// --- запуск + graceful shutdown ---

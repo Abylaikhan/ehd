@@ -15,12 +15,13 @@ import (
 
 // Handler — HTTP-обработчики модуля ЕВГА.
 type Handler struct {
-	svc    *application.Service
-	status *application.StatusService
+	svc     *application.Service
+	status  *application.StatusService
+	notices *application.NoticeService
 }
 
-func NewHandler(svc *application.Service, status *application.StatusService) *Handler {
-	return &Handler{svc: svc, status: status}
+func NewHandler(svc *application.Service, status *application.StatusService, notices *application.NoticeService) *Handler {
+	return &Handler{svc: svc, status: status, notices: notices}
 }
 
 // mapErr — доменные ошибки → единый контракт ошибок (спеки 007/008).
@@ -37,6 +38,14 @@ func mapErr(err error) error {
 		return httpserver.NewError(fiber.StatusNotFound, "NOT_FOUND", "Запись не найдена")
 	case errors.Is(err, domain.ErrSourceUnavailable):
 		return httpserver.NewError(fiber.StatusServiceUnavailable, "EVGA_SOURCE_UNAVAILABLE", "Источник данных ОБМ ЕВГА недоступен")
+	case errors.Is(err, domain.ErrNoticeNotEditable):
+		return httpserver.NewError(fiber.StatusUnprocessableEntity, "NOTICE_NOT_EDITABLE",
+			"Операция доступна только для уведомления в статусе «Проект создан»")
+	case errors.Is(err, domain.ErrAddresseeRequired):
+		return httpserver.NewError(fiber.StatusBadRequest, "ADDRESSEE_REQUIRED", err.Error(),
+			httpserver.ErrorDetail{Field: "its_cli_id", Reason: "required"})
+	case errors.Is(err, domain.ErrNoOwnerDepartment):
+		return httpserver.NewError(fiber.StatusForbidden, "ACCESS_DENIED", err.Error())
 	case errors.Is(err, application.ErrReadOnlyMode):
 		return httpserver.NewError(fiber.StatusForbidden, "EVGA_READ_ONLY", "Модуль ОБМ ЕВГА работает в режиме чтения")
 	case errors.Is(err, application.ErrCuratorReadOnly):
