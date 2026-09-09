@@ -1,8 +1,10 @@
 package http
 
 import (
+	"bytes"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -229,6 +231,26 @@ func (h *Handler) noticeOut(c *fiber.Ctx) error {
 		"doc_date": docDate,
 		"exec_due": out.ExecDueTime,
 	})
+}
+
+// noticePDF — GET /notices/:id/pdf (спека 012 FR-1).
+func (h *Handler) noticePDF(c *fiber.Ctx) error {
+	id, err := noticeIDParam(c)
+	if err != nil {
+		return err
+	}
+	var buf bytes.Buffer
+	docnum, err := h.pdf.Render(c.UserContext(), identityFrom(c), id, &buf)
+	if err != nil {
+		return mapApprovalErr(err)
+	}
+	name := "uvedomlenie-" + strconv.FormatInt(id, 10)
+	if docnum != "" {
+		name = "uvedomlenie-" + strings.ReplaceAll(docnum, "/", "-")
+	}
+	c.Set(fiber.HeaderContentType, "application/pdf")
+	c.Set(fiber.HeaderContentDisposition, `attachment; filename="`+name+`.pdf"`)
+	return c.Send(buf.Bytes())
 }
 
 // deptUsers — GET /notices/:id/participants?q= (FR-3).

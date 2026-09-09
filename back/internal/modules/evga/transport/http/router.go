@@ -38,4 +38,5 @@ func Register(r fiber.Router, h *Handler, guard *Guard) {
 	user.Post("/notices/:id/outgoing", h.noticeOutgoing)
 	user.Post("/notices/:id/register", h.noticeRegister)
 	user.Get("/notices/:id/out", h.noticeOut)
+	user.Get("/notices/:id/pdf", h.noticePDF)
 }
