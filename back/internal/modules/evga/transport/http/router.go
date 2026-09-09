@@ -33,4 +33,9 @@ func Register(r fiber.Router, h *Handler, guard *Guard) {
 	user.Post("/notices/:id/submit", h.noticeSubmit)
 	user.Post("/notices/:id/approve", h.noticeApprove)
 	user.Post("/notices/:id/reject", h.noticeReject)
+
+	// исходящее и регистрация (спека 011)
+	user.Post("/notices/:id/outgoing", h.noticeOutgoing)
+	user.Post("/notices/:id/register", h.noticeRegister)
+	user.Get("/notices/:id/out", h.noticeOut)
 }

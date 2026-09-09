@@ -158,6 +158,79 @@ func (h *Handler) noticeReject(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"rejected": true})
 }
 
+// noticeOutgoing — POST /notices/:id/outgoing (спека 011 FR-1).
+func (h *Handler) noticeOutgoing(c *fiber.Ctx) error {
+	id, err := noticeIDParam(c)
+	if err != nil {
+		return err
+	}
+	outID, err := h.outgoing.CreateOutgoing(c.UserContext(), identityFrom(c), id)
+	if err != nil {
+		return mapApprovalErr(err)
+	}
+	return c.JSON(fiber.Map{"out_id": outID})
+}
+
+type registerReq struct {
+	DocNum  string `json:"doc_num"`
+	DocDate string `json:"doc_date"` // YYYY-MM-DD
+}
+
+// noticeRegister — POST /notices/:id/register (спека 011 FR-6, только админ: симуляция канцелярии).
+func (h *Handler) noticeRegister(c *fiber.Ctx) error {
+	id, err := noticeIDParam(c)
+	if err != nil {
+		return err
+	}
+	var req registerReq
+	if err := c.BodyParser(&req); err != nil {
+		return httpserver.NewError(fiber.StatusBadRequest, "INVALID_FILTER", "Некорректное тело запроса",
+			httpserver.ErrorDetail{Field: "body", Reason: "invalid_json"})
+	}
+	docDate, err := time.Parse("2006-01-02", req.DocDate)
+	if err != nil {
+		return httpserver.NewError(fiber.StatusBadRequest, "INVALID_FILTER", "Некорректная дата регистрации",
+			httpserver.ErrorDetail{Field: "doc_date", Reason: "expected_YYYY-MM-DD"})
+	}
+	res, err := h.outgoing.SimulateRegistration(c.UserContext(), identityFrom(c), id, req.DocNum, docDate)
+	if err != nil {
+		return mapApprovalErr(err)
+	}
+	return c.JSON(fiber.Map{
+		"applied":  res.Applied,
+		"updated":  res.Updated,
+		"cascaded": res.Cascaded,
+		"exec_due": res.ExecDue,
+	})
+}
+
+// noticeOut — GET /notices/:id/out — данные исходящего для карточки (FR-7).
+func (h *Handler) noticeOut(c *fiber.Ctx) error {
+	id, err := noticeIDParam(c)
+	if err != nil {
+		return err
+	}
+	out, err := h.outgoing.Out(c.UserContext(), identityFrom(c), id)
+	if err != nil {
+		return mapApprovalErr(err)
+	}
+	if out == nil {
+		return c.JSON(fiber.Map{"exists": false})
+	}
+	var docDate *string
+	if out.DocDate != nil {
+		v := out.DocDate.Format("2006-01-02")
+		docDate = &v
+	}
+	return c.JSON(fiber.Map{
+		"exists":   true,
+		"out_id":   out.ID,
+		"doc_num":  out.DocNum,
+		"doc_date": docDate,
+		"exec_due": out.ExecDueTime,
+	})
+}
+
 // deptUsers — GET /notices/:id/participants?q= (FR-3).
 func (h *Handler) deptUsers(c *fiber.Ctx) error {
 	id, err := noticeIDParam(c)

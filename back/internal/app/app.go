@@ -153,6 +153,7 @@ func Run(cfg *config.Config) error {
 	var evgaStatusService *evgaapp.StatusService
 	var evgaNoticeService *evgaapp.NoticeService
 	var evgaApprovalService *evgaapp.ApprovalService
+	var evgaOutgoingService *evgaapp.OutgoingService
 	if cfg.EVGA.Enabled() {
 		evgaDSN := cfg.EVGA.DSN
 		if !cfg.EVGA.WriteEnabled {
@@ -192,8 +193,13 @@ func Run(cfg *config.Config) error {
 		if err := evgarepo.MigrateRoute(db); err != nil {
 			return err
 		}
+		evgaApprovalRepo := evgarepo.NewApprovalRepo(evgaDB)
+		evgaRouteRepo := evgarepo.NewRouteRepo(db)
 		evgaApprovalService = evgaapp.NewApprovalService(
-			evgarepo.NewApprovalRepo(evgaDB), evgarepo.NewRouteRepo(db),
+			evgaApprovalRepo, evgaRouteRepo,
+			evgaStatusRepo, evgaService, cfg.EVGA.WriteEnabled, log)
+		evgaOutgoingService = evgaapp.NewOutgoingService(
+			evgarepo.NewOutgoingRepo(evgaDB), evgaApprovalRepo, evgaRouteRepo,
 			evgaStatusRepo, evgaService, cfg.EVGA.WriteEnabled, log)
 	} else {
 		log.Info("evga: модуль выключен (EVGA_PG_DSN не задан)")
@@ -235,8 +241,16 @@ func Run(cfg *config.Config) error {
 	reporterhttp.Register(api.Group("/reporter"), reporterHandler, reporterGuard)
 	if evgaService != nil {
 		evgahttp.Register(api.Group("/evga"),
-			evgahttp.NewHandler(evgaService, evgaStatusService, evgaNoticeService, evgaApprovalService),
+			evgahttp.NewHandler(evgaService, evgaStatusService, evgaNoticeService, evgaApprovalService, evgaOutgoingService),
 			evgahttp.NewGuard(authService))
+	}
+
+	// вотчер регистрации исходящих (спека 011 FR-5): платформа проставляет doc_num —
+	// мы выполняем транзакцию §11.3; останавливается вместе с сервером
+	watchCtx, watchCancel := context.WithCancel(context.Background())
+	defer watchCancel()
+	if evgaOutgoingService != nil {
+		go evgaOutgoingService.Watch(watchCtx, cfg.EVGA.WatchInterval)
 	}
 
 	// --- запуск + graceful shutdown ---

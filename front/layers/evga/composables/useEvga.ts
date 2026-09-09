@@ -128,10 +128,21 @@ export function useEvga() {
   const noticeReject = (noticeId: number, comment: string) =>
     api<{ rejected: boolean }>(`/api/v1/evga/notices/${noticeId}/reject`, { method: 'POST', body: { comment } })
 
+  // --- исходящее (backend-спека 011) ---
+
+  const noticeOutgoing = (noticeId: number) =>
+    api<{ out_id: number }>(`/api/v1/evga/notices/${noticeId}/outgoing`, { method: 'POST' })
+
+  const noticeOut = (noticeId: number) =>
+    api<{ exists: boolean; out_id?: number; doc_num?: string; doc_date?: string | null; exec_due?: string }>(
+      `/api/v1/evga/notices/${noticeId}/out`,
+    )
+
   return {
     registry, card, references, exportRegistry, changeStatus, bulkStatus, history,
     noticePreview, noticeCreate, noticeList, noticeGet, noticeDelete, cliSearch,
     routeGet, routePut, participants, noticeSubmit, noticeApprove, noticeReject,
+    noticeOutgoing, noticeOut,
   }
 }
 

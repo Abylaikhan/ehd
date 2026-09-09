@@ -82,6 +82,8 @@ services:
       EVGA_PG_DSN: ${EVGA_PG_DSN:-postgres://${POSTGRES_USER:-ehd}:${POSTGRES_PASSWORD:-ehd_local}@postgres:5432/obm_evga?sslmode=disable}
       # Запись разрешена ТОЛЬКО потому, что это dev-реплика; для прода — false до согласования
       EVGA_WRITE_ENABLED: ${EVGA_WRITE_ENABLED:-true}
+      # Вотчер регистрации исходящих (спека 011): платформа проставляет doc_num — мы завершаем §11.3
+      EVGA_OUT_WATCH_INTERVAL: ${EVGA_OUT_WATCH_INTERVAL:-60s}
       # ЭЦП: stub (sandbox) или ncalayer (реальная проверка CMS по корням НУЦ РК из EDS_TRUST_DIR)
       EDS_MODE: ${EDS_MODE:-stub}
       EDS_TRUST_DIR: /app/eds-trust
