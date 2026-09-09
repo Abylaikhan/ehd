@@ -102,6 +102,25 @@ async function submit() {
 
 // --- решения согласующего ---
 const isApproving = computed(() => props.statusId === 2)
+// этап «Создать исходящее» (спека 011): статус «На подписании» + открытый шаг outgoing
+const hasOpenOutgoing = computed(
+  () => props.statusId === 5 && (route.value?.history ?? []).some((s) => s.kind === 'outgoing' && s.status === 'open'),
+)
+
+async function createOutgoing() {
+  busy.value = true
+  error.value = ''
+  try {
+    await evga.noticeOutgoing(props.noticeId)
+    info.value = 'Исходящее создано. После регистрации канцелярией статусы записей обновятся автоматически.'
+    refreshRoute()
+    emit('changed')
+  } catch (e) {
+    error.value = apiErrorMessage(e)
+  } finally {
+    busy.value = false
+  }
+}
 const rejectDialog = ref(false)
 const rejectComment = ref('')
 
@@ -205,6 +224,9 @@ const fmtTS = (v: string | null) => (v ? new Date(v).toLocaleString('ru-RU') : '
         <div v-if="isApproving && canWrite" class="actions">
           <Button label="Согласовать и подписать" icon="pi pi-check-circle" severity="success" :loading="busy" @click="approve" />
           <Button label="Вернуть на доработку" icon="pi pi-undo" severity="danger" outlined :loading="busy" @click="rejectDialog = true" />
+        </div>
+        <div v-if="hasOpenOutgoing && canWrite" class="actions">
+          <Button label="Создать исходящее" icon="pi pi-envelope" :loading="busy" @click="createOutgoing" />
         </div>
       </template>
 

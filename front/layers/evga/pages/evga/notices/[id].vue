@@ -15,6 +15,17 @@ const { data: card, pending, error, refresh } = useLazyAsyncData(
   { server: false },
 )
 
+// исходящее письмо (спека 011 FR-7)
+const { data: outData, refresh: refreshOut } = useLazyAsyncData(
+  `evga-notice-out-${id.value}`,
+  () => evga.noticeOut(id.value),
+  { server: false },
+)
+function refreshAll() {
+  refresh()
+  refreshOut()
+}
+
 const header = computed(() => card.value?.header)
 const isDraft = computed(() => header.value?.status_id === 1)
 
@@ -100,6 +111,11 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
             <dt>Записей в приложении</dt><dd>{{ header?.rows_count }}</dd>
             <dt>Общая сумма</dt><dd>{{ fmtAmount(header?.total_sum || '0') }}</dd>
             <dt>Департамент</dt><dd>{{ header?.department || '—' }}</dd>
+            <template v-if="outData?.exists">
+              <dt>Исходящее письмо</dt><dd>{{ outData.doc_num || 'создано, ожидает регистрации' }}</dd>
+              <dt v-if="outData.doc_date">Дата регистрации</dt><dd v-if="outData.doc_date">{{ fmtDate(outData.doc_date) }}</dd>
+              <dt v-if="outData.exec_due">Срок исполнения</dt><dd v-if="outData.exec_due">{{ fmtDate(outData.exec_due) }}</dd>
+            </template>
           </dl>
         </template>
       </Card>
@@ -116,7 +132,7 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
         :status-id="header?.status_id ?? null"
         :can-write="canWrite"
         class="mb"
-        @changed="refresh"
+        @changed="refreshAll"
       />
 
       <Card>

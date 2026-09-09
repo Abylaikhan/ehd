@@ -104,8 +104,9 @@ type Reporter struct {
 // WriteEnabled=false (по умолчанию) — строго read-only DSN, пишущие эндпоинты закрыты;
 // включается только после согласования миграций с заказчиком (dev-реплика — можно).
 type EVGA struct {
-	DSN          string
-	WriteEnabled bool
+	DSN           string
+	WriteEnabled  bool
+	WatchInterval time.Duration // вотчер регистрации исходящих (спека 011 FR-5); 0 — выключен
 }
 
 // Enabled — модуль ЕВГА включён, если задан DSN внешней БД.
@@ -132,6 +133,7 @@ func New() (*Config, error) {
 	v.SetDefault("NCANODE_URL", "http://ncanode:14579")
 	v.SetDefault("REPORTER_SYSTEM_DB_DENYLIST", "system,INFORMATION_SCHEMA,information_schema")
 	v.SetDefault("EVGA_WRITE_ENABLED", false)
+	v.SetDefault("EVGA_OUT_WATCH_INTERVAL", "60s")
 
 	cfg := &Config{
 		App:  App{Name: v.GetString("APP_NAME"), Env: v.GetString("APP_ENV")},
@@ -167,8 +169,9 @@ func New() (*Config, error) {
 			SystemDBDenylist: splitList(v.GetString("REPORTER_SYSTEM_DB_DENYLIST")),
 		},
 		EVGA: EVGA{
-			DSN:          v.GetString("EVGA_PG_DSN"),
-			WriteEnabled: v.GetBool("EVGA_WRITE_ENABLED"),
+			DSN:           v.GetString("EVGA_PG_DSN"),
+			WriteEnabled:  v.GetBool("EVGA_WRITE_ENABLED"),
+			WatchInterval: v.GetDuration("EVGA_OUT_WATCH_INTERVAL"),
 		},
 	}
 
