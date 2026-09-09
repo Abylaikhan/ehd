@@ -44,6 +44,19 @@ const screenState = computed(() => {
   return 'ready'
 })
 
+const pdfBusy = ref(false)
+async function downloadPDF() {
+  pdfBusy.value = true
+  actionError.value = ''
+  try {
+    await evga.noticePDF(id.value)
+  } catch (e) {
+    actionError.value = apiErrorMessage(e)
+  } finally {
+    pdfBusy.value = false
+  }
+}
+
 const deleting = ref(false)
 const actionError = ref('')
 const confirmDelete = ref(false)
@@ -80,6 +93,7 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
       :description="header ? `${header.status_title || '—'} · ГУ ${header.gu} · ${header.sendername}` : undefined"
     >
       <template #actions>
+        <Button label="Скачать PDF" icon="pi pi-file-pdf" outlined :loading="pdfBusy" @click="downloadPDF" />
         <Button
           v-if="canWrite && isDraft"
           label="Удалить проект"

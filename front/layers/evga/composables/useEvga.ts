@@ -138,11 +138,26 @@ export function useEvga() {
       `/api/v1/evga/notices/${noticeId}/out`,
     )
 
+  // PDF уведомления по образцу (backend-спека 012): blob + скачивание браузером
+  const noticePDF = async (noticeId: number) => {
+    const res = await api.raw(`/api/v1/evga/notices/${noticeId}/pdf`, { responseType: 'blob' })
+    const blob = res._data as Blob
+    const name = filenameFromDisposition(res.headers.get('content-disposition'), 'uvedomlenie.pdf')
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = name
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
   return {
     registry, card, references, exportRegistry, changeStatus, bulkStatus, history,
     noticePreview, noticeCreate, noticeList, noticeGet, noticeDelete, cliSearch,
     routeGet, routePut, participants, noticeSubmit, noticeApprove, noticeReject,
-    noticeOutgoing, noticeOut,
+    noticeOutgoing, noticeOut, noticePDF,
   }
 }
 

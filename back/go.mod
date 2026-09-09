@@ -5,6 +5,7 @@ go 1.26
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.30.0
 	github.com/ddulesov/pkcs7 v1.0.3
+	github.com/go-pdf/fpdf v0.9.0
 	github.com/gofiber/fiber/v2 v2.52.5
 	github.com/google/uuid v1.6.0
 	github.com/spf13/viper v1.19.0
