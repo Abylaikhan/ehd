@@ -51,6 +51,11 @@ type RiskRecord struct {
 	FlFT             string
 	CreatedAt        *time.Time
 	UpdatedAt        *time.Time
+
+	// Контрольный срок (EVGA-FR-080). ExecDue — its_out.exec_due_time (строка YYYY-MM-DD
+	// или пусто); DeadlineState — вычисленное состояние: ""|"expiring"|"expired".
+	ExecDue       string
+	DeadlineState string
 }
 
 // Filter — фильтры реестра (EVGA-FR-013 / spec FR-6). Nil/пусто — фильтр не применяется.
@@ -69,6 +74,10 @@ type Filter struct {
 	InNotice     *bool
 	NoticeNum    string
 	DepartmentID *int64 // применяется только при scope «все департаменты»
+
+	// ConfirmedNoDecision (EVGA-FR-082): быстрый фильтр «Подтверждено без решения» —
+	// записи в статусе 11 (решение 7/12 уводит из 11). Эквивалент its_risk_status_id = 11.
+	ConfirmedNoDecision *bool
 }
 
 // Page — запрос страницы (spec FR-7).

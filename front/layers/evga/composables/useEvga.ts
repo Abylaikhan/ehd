@@ -30,6 +30,7 @@ export interface EvgaRegistryParams {
   amount_to?: number | null
   in_notice?: boolean | null
   notice_num?: string
+  confirmed_no_decision?: boolean | null
   department_id?: number | null
   page?: number
   page_size?: number

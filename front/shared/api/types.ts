@@ -365,6 +365,10 @@ export interface EvgaRecord {
   department_title: string
   notice_num: string
   out_num: string
+  // Контрольный срок (EVGA-FR-080). exec_due — YYYY-MM-DD или отсутствует;
+  // deadline_state — '' | 'expiring' | 'expired' (пусто → поле отсутствует).
+  exec_due?: string
+  deadline_state?: '' | 'expiring' | 'expired'
 }
 
 export interface EvgaCard extends EvgaRecord {

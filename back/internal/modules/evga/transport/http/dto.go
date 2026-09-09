@@ -100,6 +100,9 @@ func parseFilter(c *fiber.Ctx) (domain.Filter, error) {
 	if f.InNotice, err = qBool(c, "in_notice"); err != nil {
 		return f, err
 	}
+	if f.ConfirmedNoDecision, err = qBool(c, "confirmed_no_decision"); err != nil {
+		return f, err
+	}
 	if f.DepartmentID, err = qInt64(c, "department_id"); err != nil {
 		return f, err
 	}
@@ -154,6 +157,11 @@ type recordResp struct {
 
 	NoticeNum string `json:"notice_num"`
 	OutNum    string `json:"out_num"`
+
+	// Контрольный срок (EVGA-FR-080). ExecDue — YYYY-MM-DD или пусто;
+	// DeadlineState — ""|"expiring"|"expired".
+	ExecDue       string `json:"exec_due,omitempty"`
+	DeadlineState string `json:"deadline_state,omitempty"`
 }
 
 type cardResp struct {
@@ -195,6 +203,7 @@ func toRecordResp(r domain.RiskRecord) recordResp {
 		StatusID: r.StatusID, StatusTitle: r.StatusTitle, StatusNote: r.StatusNote,
 		DepartmentID: r.DepartmentID, DepartmentTitle: r.DepartmentTitle,
 		NoticeNum: r.NoticeNum, OutNum: r.OutNum,
+		ExecDue: r.ExecDue, DeadlineState: r.DeadlineState,
 	}
 }
 

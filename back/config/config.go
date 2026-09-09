@@ -107,6 +107,7 @@ type EVGA struct {
 	DSN           string
 	WriteEnabled  bool
 	WatchInterval time.Duration // вотчер регистрации исходящих (спека 011 FR-5); 0 — выключен
+	DeadlineWarn  int           // окно «истекающий срок» в днях (спека 013 FR-4); 0 — дефолт 3
 }
 
 // Enabled — модуль ЕВГА включён, если задан DSN внешней БД.
@@ -134,6 +135,7 @@ func New() (*Config, error) {
 	v.SetDefault("REPORTER_SYSTEM_DB_DENYLIST", "system,INFORMATION_SCHEMA,information_schema")
 	v.SetDefault("EVGA_WRITE_ENABLED", false)
 	v.SetDefault("EVGA_OUT_WATCH_INTERVAL", "60s")
+	v.SetDefault("EVGA_DEADLINE_WARN_DAYS", 3)
 
 	cfg := &Config{
 		App:  App{Name: v.GetString("APP_NAME"), Env: v.GetString("APP_ENV")},
@@ -172,6 +174,7 @@ func New() (*Config, error) {
 			DSN:           v.GetString("EVGA_PG_DSN"),
 			WriteEnabled:  v.GetBool("EVGA_WRITE_ENABLED"),
 			WatchInterval: v.GetDuration("EVGA_OUT_WATCH_INTERVAL"),
+			DeadlineWarn:  v.GetInt("EVGA_DEADLINE_WARN_DAYS"),
 		},
 	}
 
