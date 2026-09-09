@@ -154,6 +154,7 @@ func Run(cfg *config.Config) error {
 	var evgaNoticeService *evgaapp.NoticeService
 	var evgaApprovalService *evgaapp.ApprovalService
 	var evgaOutgoingService *evgaapp.OutgoingService
+	var evgaPDFService *evgaapp.PDFService
 	if cfg.EVGA.Enabled() {
 		evgaDSN := cfg.EVGA.DSN
 		if !cfg.EVGA.WriteEnabled {
@@ -184,6 +185,7 @@ func Run(cfg *config.Config) error {
 				zap.Bool("write_enabled", cfg.EVGA.WriteEnabled))
 		}
 		evgaService = evgaapp.NewService(evgaRepo, authService, log)
+		evgaService.SetDeadlineWarnDays(cfg.EVGA.DeadlineWarn) // спека 013 FR-4
 		evgaStatusRepo := evgarepo.NewStatusRepo(evgaDB)
 		evgaStatusService = evgaapp.NewStatusService(evgaStatusRepo, evgaService, cfg.EVGA.WriteEnabled, log)
 		evgaNoticeService = evgaapp.NewNoticeService(
@@ -201,6 +203,7 @@ func Run(cfg *config.Config) error {
 		evgaOutgoingService = evgaapp.NewOutgoingService(
 			evgarepo.NewOutgoingRepo(evgaDB), evgaApprovalRepo, evgaRouteRepo,
 			evgaStatusRepo, evgaService, cfg.EVGA.WriteEnabled, log)
+		evgaPDFService = evgaapp.NewPDFService(evgaRepo, evgaService)
 	} else {
 		log.Info("evga: модуль выключен (EVGA_PG_DSN не задан)")
 	}
@@ -241,7 +244,7 @@ func Run(cfg *config.Config) error {
 	reporterhttp.Register(api.Group("/reporter"), reporterHandler, reporterGuard)
 	if evgaService != nil {
 		evgahttp.Register(api.Group("/evga"),
-			evgahttp.NewHandler(evgaService, evgaStatusService, evgaNoticeService, evgaApprovalService, evgaOutgoingService),
+			evgahttp.NewHandler(evgaService, evgaStatusService, evgaNoticeService, evgaApprovalService, evgaOutgoingService, evgaPDFService),
 			evgahttp.NewGuard(authService))
 	}
 

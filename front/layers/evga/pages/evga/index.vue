@@ -26,6 +26,7 @@ const fAmountFrom = ref<number | null>(null)
 const fAmountTo = ref<number | null>(null)
 const fInNotice = ref<boolean | null>(null)
 const fNoticeNum = ref('')
+const fConfirmedNoDecision = ref(false) // быстрый фильтр «Подтверждено без решения» (EVGA-FR-082)
 const fDepartment = ref<number | null>(null)
 
 const inNoticeOptions = [
@@ -59,6 +60,7 @@ function buildParams(): EvgaRegistryParams {
     amount_to: fAmountTo.value,
     in_notice: fInNotice.value,
     notice_num: fNoticeNum.value.trim(),
+    confirmed_no_decision: fConfirmedNoDecision.value ? true : null,
     department_id: fDepartment.value,
   }
 }
@@ -72,6 +74,7 @@ function resetFilters() {
   fGu.value = fSender.value = fIin.value = fNoticeNum.value = ''
   fAmountFrom.value = fAmountTo.value = null
   fInNotice.value = null
+  fConfirmedNoDecision.value = false
   fDepartment.value = null
   applyFilters()
 }
@@ -203,6 +206,10 @@ const fmtDate = (v: string | null) => {
   return `${d}.${m}.${y}`
 }
 const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].filter(Boolean).join(' ')
+
+// Подсветка строк по контрольному сроку (EVGA-FR-080); состояние приходит с сервера.
+const rowClass = (r: EvgaRecord) =>
+  r.deadline_state === 'expired' ? 'row-expired' : r.deadline_state === 'expiring' ? 'row-expiring' : ''
 </script>
 
 <template>
@@ -243,6 +250,15 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
             <InputNumber v-model="fAmountTo" placeholder="Сумма до" :min-fraction-digits="0" :max-fraction-digits="2" class="f-mid" />
             <Select v-model="fInNotice" :options="inNoticeOptions" option-label="label" option-value="value" placeholder="Уведомление" class="f-mid" />
             <InputText v-model="fNoticeNum" placeholder="№ уведомления" class="f-mid" @keyup.enter="applyFilters" />
+            <ToggleButton
+              v-model="fConfirmedNoDecision"
+              on-label="Подтверждено без решения"
+              off-label="Подтверждено без решения"
+              on-icon="pi pi-check"
+              off-icon="pi pi-filter"
+              class="f-toggle"
+              @update:model-value="applyFilters"
+            />
             <div class="f-actions">
               <Button label="Применить" icon="pi pi-filter" @click="applyFilters" />
               <Button label="Сбросить" icon="pi pi-filter-slash" text severity="secondary" @click="resetFilters" />
@@ -283,6 +299,7 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
             size="small"
             scrollable
             class="data-table"
+            :row-class="rowClass"
             @sort="onSort"
           >
             <template #empty>
@@ -314,6 +331,16 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
             </Column>
             <Column header="Исходящее">
               <template #body="{ data: r }">{{ r.out_num || '—' }}</template>
+            </Column>
+            <Column header="Срок" :style="{ minWidth: '9.5rem' }">
+              <template #body="{ data: r }">
+                <span v-if="r.exec_due" class="due-cell">
+                  {{ fmtDate(r.exec_due) }}
+                  <Tag v-if="r.deadline_state === 'expired'" value="истёк" severity="danger" />
+                  <Tag v-else-if="r.deadline_state === 'expiring'" value="истекает" severity="warn" />
+                </span>
+                <span v-else>—</span>
+              </template>
             </Column>
             <Column :style="{ width: '3rem' }">
               <template #body="{ data: r }">
@@ -381,6 +408,11 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
 .data-table { border: 1px solid var(--ehd-border); border-radius: var(--ehd-radius-sm); overflow: hidden; }
 .empty-row { padding: 1.5rem; text-align: center; color: var(--p-text-muted-color); }
 .num { text-align: right; }
+.f-toggle { white-space: nowrap; }
+.due-cell { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+/* Подсветка строк по контрольному сроку (EVGA-FR-080). td-фон перекрывает striped-rows. */
+:deep(tr.row-expired > td) { background: var(--p-red-50); }
+:deep(tr.row-expiring > td) { background: var(--p-orange-50); }
 .report-line { margin: 0 0 0.75rem; font-size: 0.95rem; }
 .report-table { border: 1px solid var(--ehd-border); border-radius: var(--ehd-radius-sm); overflow: hidden; }
 </style>

@@ -31,6 +31,7 @@ const recordColumns = `
 	coalesce(t.risk_status_note,'') as status_note,
 	t.its_departments_id as department_id, coalesce(d.title,'') as department_title,
 	ln.notice_id, coalesce(ln.notice_num,'') as notice_num, coalesce(ln.out_num,'') as out_num,
+	coalesce(ln.exec_due,'') as exec_due,
 	t.refund::text as refund, t.amount_for_vozvrat::text as amount_for_vozvrat,
 	t.its_activity_id as activity_id, t.is_gbdfl,
 	coalesce(t.fl_fm,'') as fl_fm, coalesce(t.fl_nm,'') as fl_nm, coalesce(t.fl_ft,'') as fl_ft,
@@ -40,7 +41,8 @@ const recordColumns = `
 // Связь по tb_5_15a_id (рабочий FK, ТЗ §8.4); its_out — через шапку уведомления
 // (its_tb_5_15a.its_out_id в витрине — HTML-ссылка платформы, для связи непригодна).
 const noticeLateral = `left join lateral (
-	select n.id as notice_id, rq.docnum as notice_num, o.doc_num as out_num
+	select n.id as notice_id, rq.docnum as notice_num, o.doc_num as out_num,
+	       o.exec_due_time as exec_due
 	  from its_risk_notice_5_15a sn
 	  join its_risk_notice n on n.id = sn.its_risk_notice_id and n."in$trash" is null
 	  left join its_req rq on rq.id = n.req_id
@@ -76,6 +78,7 @@ type rowScan struct {
 	NoticeID         *int64
 	NoticeNum        string
 	OutNum           string
+	ExecDue          string
 	Refund           *string
 	AmountForVozvrat *string
 	ActivityID       *int64
@@ -97,6 +100,7 @@ func (r rowScan) toDomain() domain.RiskRecord {
 		StatusID: r.StatusID, StatusTitle: r.StatusTitle, StatusNote: r.StatusNote,
 		DepartmentID: r.DepartmentID, DepartmentTitle: r.DepartmentTitle,
 		NoticeID: r.NoticeID, NoticeNum: r.NoticeNum, OutNum: r.OutNum,
+		ExecDue:    r.ExecDue,
 		ActivityID: r.ActivityID, IsGBDFL: r.IsGbdfl,
 		FlFM: r.FlFM, FlNM: r.FlNM, FlFT: r.FlFT,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
@@ -132,6 +136,10 @@ func (rp *RegistryRepo) base(ctx context.Context, f domain.Filter, deptID *int64
 	}
 	if f.StatusID != nil {
 		q = q.Where("t.its_risk_status_id = ?", *f.StatusID)
+	}
+	// EVGA-FR-082: «Подтверждено без решения» = текущий статус 11 (решение 7/12 уводит из 11).
+	if f.ConfirmedNoDecision != nil && *f.ConfirmedNoDecision {
+		q = q.Where("t.its_risk_status_id = ?", domain.StatusConfirmed)
 	}
 	if f.God != nil {
 		q = q.Where("t.god = ?", *f.God)

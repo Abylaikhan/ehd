@@ -40,17 +40,38 @@ type scopeEntry struct {
 
 // Service — приложение модуля ЕВГА.
 type Service struct {
-	repo Repo
-	iin  IINProvider
-	log  *zap.Logger
-	now  func() time.Time
+	repo     Repo
+	iin      IINProvider
+	log      *zap.Logger
+	now      func() time.Time
+	warnDays int // окно «истекающий» для подсветки сроков (EVGA-FR-080)
 
 	mu    sync.RWMutex
 	cache map[string]scopeEntry // userID → scope
 }
 
 func NewService(repo Repo, iin IINProvider, log *zap.Logger) *Service {
-	return &Service{repo: repo, iin: iin, log: log, now: time.Now, cache: map[string]scopeEntry{}}
+	return &Service{
+		repo: repo, iin: iin, log: log, now: time.Now,
+		warnDays: domain.DefaultDeadlineWarnDays,
+		cache:    map[string]scopeEntry{},
+	}
+}
+
+// SetDeadlineWarnDays переопределяет окно предупреждения о сроке (EVGA_DEADLINE_WARN_DAYS).
+// Некорректное значение (<=0) игнорируется — остаётся дефолт.
+func (s *Service) SetDeadlineWarnDays(days int) {
+	if days > 0 {
+		s.warnDays = days
+	}
+}
+
+// enrichDeadline проставляет вычисленное состояние контрольного срока (EVGA-FR-080).
+func (s *Service) enrichDeadline(items []domain.RiskRecord) {
+	now := s.now()
+	for i := range items {
+		items[i].DeadlineState = domain.DeadlineState(items[i].ExecDue, items[i].StatusID, s.warnDays, now)
+	}
 }
 
 // hasRole — проверка кода роли в доверенной личности.
@@ -146,6 +167,7 @@ func (s *Service) List(ctx context.Context, id contract.Identity, f domain.Filte
 	if err != nil {
 		return domain.RecordPage{}, scope, s.wrapSourceErr(ctx, err)
 	}
+	s.enrichDeadline(res.Items)
 	return res, scope, nil
 }
 
@@ -161,6 +183,9 @@ func (s *Service) Card(ctx context.Context, id contract.Identity, recordID int64
 	rec, err := s.repo.Get(ctx, recordID, deptFilter(scope))
 	if err != nil && err != domain.ErrNotFound {
 		return domain.RiskRecord{}, s.wrapSourceErr(ctx, err)
+	}
+	if err == nil {
+		rec.DeadlineState = domain.DeadlineState(rec.ExecDue, rec.StatusID, s.warnDays, s.now())
 	}
 	return rec, err
 }
