@@ -19,6 +19,27 @@ const (
 	StatusAudit        int64 = 12 // Аудит
 )
 
+// statusNames — человекочитаемые наименования статусов (ТЗ §7.1) для сообщений об
+// отклонении переходов (EVGA-BR-014): в тексте показываем название, а не числовой id.
+var statusNames = map[int64]string{
+	StatusInWork:       "В работе у ДВГА",
+	StatusNoViolations: "Не подтверждено",
+	StatusNoticeSent:   "Уведомление направлено",
+	StatusWaitingDocs:  "Ожидание документов",
+	StatusRefundDue:    "Подлежит возмещению",
+	StatusRefunded:     "Возмещено",
+	StatusConfirmed:    "Подтверждено",
+	StatusAudit:        "Аудит",
+}
+
+// statusName — наименование статуса для сообщений; неизвестный id → «№N».
+func statusName(id int64) string {
+	if t, ok := statusNames[id]; ok {
+		return t
+	}
+	return fmt.Sprintf("№%d", id)
+}
+
 // Источники изменения статуса (журнал EVGA-DB-003).
 const (
 	ChangeSourceManual = "manual"
@@ -69,7 +90,7 @@ func (e *TransitionError) Unwrap() error { return e.Base }
 func notAllowed(from, to int64) *TransitionError {
 	return &TransitionError{
 		Base:   ErrTransitionNotAllowed,
-		Reason: fmt.Sprintf("Переход из статуса %d в статус %d не предусмотрен", from, to),
+		Reason: fmt.Sprintf("Переход из статуса «%s» в статус «%s» не предусмотрен", statusName(from), statusName(to)),
 	}
 }
 

@@ -55,7 +55,7 @@ func TestBackToInWorkForbidden(t *testing.T) {
 		t.Fatalf("4→1: %v", err)
 	}
 	var te *TransitionError
-	if !errors.As(err, &te) || te.Reason != "Переход из статуса 4 в статус 1 не предусмотрен" {
+	if !errors.As(err, &te) || te.Reason != "Переход из статуса «Уведомление направлено» в статус «В работе у ДВГА» не предусмотрен" {
 		t.Fatalf("текст причины: %q", err.Error())
 	}
 	if err := ValidateTransition(6, 1, TransitionAttrs{}, "", ""); !errors.Is(err, ErrTransitionNotAllowed) {
