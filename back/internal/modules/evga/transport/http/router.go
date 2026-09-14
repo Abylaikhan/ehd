@@ -39,4 +39,7 @@ func Register(r fiber.Router, h *Handler, guard *Guard) {
 	user.Post("/notices/:id/register", h.noticeRegister)
 	user.Get("/notices/:id/out", h.noticeOut)
 	user.Get("/notices/:id/pdf", h.noticePDF)
+
+	// отправка в ЕСЭДО (спека 014, вариант B; на заглушке — без сети)
+	user.Post("/notices/:id/esedo-send", h.noticeSendESEDO)
 }

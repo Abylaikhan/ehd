@@ -74,6 +74,24 @@ async function doDelete() {
   }
 }
 
+// Отправка в ЕСЭДО (спека 014, вариант B). На заглушке реально ничего не уходит.
+const esedoBusy = ref(false)
+const esedoMsg = ref('')
+async function sendESEDO() {
+  esedoBusy.value = true
+  actionError.value = ''
+  esedoMsg.value = ''
+  try {
+    const r = await evga.noticeSendESEDO(id.value)
+    esedoMsg.value = r.accepted ? `Отправлено в ЕСЭДО (${r.note || 'ок'})` : 'ЕСЭДО не приняла документ'
+    refreshAll()
+  } catch (e) {
+    actionError.value = apiErrorMessage(e)
+  } finally {
+    esedoBusy.value = false
+  }
+}
+
 const fmtAmount = (v: string) => {
   const n = Number(v)
   return Number.isFinite(n) ? n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : v
@@ -95,6 +113,13 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
       <template #actions>
         <Button label="Скачать PDF" icon="pi pi-file-pdf" outlined :loading="pdfBusy" @click="downloadPDF" />
         <Button
+          v-if="canWrite && outData?.exists"
+          label="Отправить в ЕСЭДО"
+          icon="pi pi-send"
+          :loading="esedoBusy"
+          @click="sendESEDO"
+        />
+        <Button
           v-if="canWrite && isDraft"
           label="Удалить проект"
           icon="pi pi-trash"
@@ -115,6 +140,7 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
 
     <template v-else-if="card">
       <Message v-if="actionError" severity="error" :closable="true" class="mb">{{ actionError }}</Message>
+      <Message v-if="esedoMsg" severity="success" :closable="true" class="mb">{{ esedoMsg }}</Message>
 
       <Card class="mb">
         <template #title>Реквизиты</template>
