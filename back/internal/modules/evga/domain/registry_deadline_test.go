@@ -8,7 +8,8 @@ import (
 func ptrI64(v int64) *int64 { return &v }
 
 func TestDeadlineState(t *testing.T) {
-	// фиксированное «сегодня» для детерминизма
+	// фиксированное «сегодня» = среда 2026-09-09; окно 3 рабочих дня → порог пн 2026-09-14
+	// (пропускаются сб 12 и вс 13).
 	now := time.Date(2026, 9, 9, 14, 0, 0, 0, time.UTC)
 	warn := 3
 
@@ -20,9 +21,9 @@ func TestDeadlineState(t *testing.T) {
 	}{
 		{"истёк вчера", "2026-09-08", ptrI64(StatusNoticeSent), DeadlineExpired},
 		{"истекает сегодня", "2026-09-09", ptrI64(StatusNoticeSent), DeadlineExpiring},
-		{"истекает в пределах порога", "2026-09-12", ptrI64(StatusNoticeSent), DeadlineExpiring},
-		{"на границе порога", "2026-09-12", ptrI64(StatusWaitingDocs), DeadlineExpiring},
-		{"за порогом", "2026-09-13", ptrI64(StatusNoticeSent), DeadlineNone},
+		{"выходные внутри окна", "2026-09-12", ptrI64(StatusNoticeSent), DeadlineExpiring},
+		{"граница окна — 3 рабочих дня (пн)", "2026-09-14", ptrI64(StatusWaitingDocs), DeadlineExpiring},
+		{"сразу за окном (вт)", "2026-09-15", ptrI64(StatusNoticeSent), DeadlineNone},
 		{"далеко", "2026-10-30", ptrI64(StatusNoticeSent), DeadlineNone},
 		{"статус 6 тоже считается", "2026-09-08", ptrI64(StatusWaitingDocs), DeadlineExpired},
 		{"решённый статус 11 — не считается", "2026-09-08", ptrI64(StatusConfirmed), DeadlineNone},
@@ -42,12 +43,12 @@ func TestDeadlineState(t *testing.T) {
 }
 
 func TestDeadlineStateDefaultWarn(t *testing.T) {
-	now := time.Date(2026, 9, 9, 0, 0, 0, 0, time.UTC)
-	// warnDays<=0 → дефолт (3): сегодня+3 = expiring, +4 = none
-	if got := DeadlineState("2026-09-12", ptrI64(StatusNoticeSent), 0, now); got != DeadlineExpiring {
-		t.Fatalf("дефолтный порог: +3 дня = %q, ожидалось %q", got, DeadlineExpiring)
+	now := time.Date(2026, 9, 9, 0, 0, 0, 0, time.UTC) // среда
+	// warnDays<=0 → дефолт (3 рабочих дня): порог пн 2026-09-14 = expiring, вт 09-15 = none
+	if got := DeadlineState("2026-09-14", ptrI64(StatusNoticeSent), 0, now); got != DeadlineExpiring {
+		t.Fatalf("дефолтный порог: 3 раб. дня (пн) = %q, ожидалось %q", got, DeadlineExpiring)
 	}
-	if got := DeadlineState("2026-09-13", ptrI64(StatusNoticeSent), 0, now); got != DeadlineNone {
-		t.Fatalf("дефолтный порог: +4 дня = %q, ожидалось %q", got, DeadlineNone)
+	if got := DeadlineState("2026-09-15", ptrI64(StatusNoticeSent), 0, now); got != DeadlineNone {
+		t.Fatalf("дефолтный порог: за окном (вт) = %q, ожидалось %q", got, DeadlineNone)
 	}
 }
