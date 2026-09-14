@@ -2,8 +2,8 @@ package domain
 
 import "time"
 
-// DefaultDeadlineWarnDays — окно «истекающий» по умолчанию (EVGA-FR-080; ТЗ не задаёт
-// окно, значение подтвердить у заказчика). Конфигурируется EVGA_DEADLINE_WARN_DAYS.
+// DefaultDeadlineWarnDays — окно «истекающий» в РАБОЧИХ днях (EVGA-FR-080; подтверждено
+// аналитиком, ответ В4-2 от 10.09.2026: «3 рабочих дня»). Конфигурируется EVGA_DEADLINE_WARN_DAYS.
 const DefaultDeadlineWarnDays = 3
 
 // Состояния контрольного срока записи (EVGA-FR-080).
@@ -22,7 +22,8 @@ var deadlineStatuses = map[int64]bool{
 
 // DeadlineState вычисляет состояние контрольного срока записи по its_out.exec_due_time.
 // execDue — строка "YYYY-MM-DD" (пусто = срок не задан); warnDays<=0 → берётся дефолт.
-// Сравнение по календарным датам (без времени); срок в будних днях уже учтён при регистрации.
+// «Истекающий» — срок наступает в пределах warnDays РАБОЧИХ дней от сегодня (ответ В4-2);
+// сб/вс не сокращают окно (порог сдвигается через AddBusinessDays).
 func DeadlineState(execDue string, statusID *int64, warnDays int, now time.Time) string {
 	if statusID == nil || !deadlineStatuses[*statusID] {
 		return DeadlineNone
@@ -41,8 +42,8 @@ func DeadlineState(execDue string, statusID *int64, warnDays int, now time.Time)
 	if dueDay.Before(today) {
 		return DeadlineExpired
 	}
-	daysLeft := int(dueDay.Sub(today).Hours() / 24)
-	if daysLeft <= warnDays {
+	// порог — дата через warnDays рабочих дней; срок на неё или раньше → «истекающий».
+	if !dueDay.After(AddBusinessDays(today, warnDays)) {
 		return DeadlineExpiring
 	}
 	return DeadlineNone
