@@ -1,0 +1,22 @@
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><SOAP-ENV:Header xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"><wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd" xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd"><ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+<ds:SignedInfo>
+<ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+<ds:SignatureMethod Algorithm="urn:ietf:params:xml:ns:pkigovkz:xmlsec:algorithms:gostr34102015-gostr34112015-512"/>
+<ds:Reference URI="#id-4b091b41-d6b7-439b-9bac-2abc6aba9d94">
+<ds:Transforms>
+<ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+</ds:Transforms>
+<ds:DigestMethod Algorithm="urn:ietf:params:xml:ns:pkigovkz:xmlsec:algorithms:gostr34112015-512"/>
+<ds:DigestValue>q2uCQZeSOlaesKcWu+5oqduV0BEdc4/Ltz7KRsUR9/+E/EXN1OegRIGJolVDdcntUeQ+IR7aTkXb
+Amvgu/M0IQ==</ds:DigestValue>
+</ds:Reference>
+</ds:SignedInfo>
+<ds:SignatureValue>
+4RQGxPc0K3IfHZ48QBixJfJ6XNpXlb4bSplOLNrDHjEzDfeJ3GfXb+qf+PffocV1dXc3yJ/WgMhl
+RU81n3Usnus+pEuEEOn7qyX3nTLjvJ6O6bSzJZvErbmsPx1jlqTuqoKVEtfVNEBq+ndvHVHmEnBj
+VjOKCy2nlN6LZ64163M=
+</ds:SignatureValue>
+<ds:KeyInfo>
+<wsse:SecurityTokenReference><wsse:KeyIdentifier EncodingType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-soap-message-security-1.0#Base64Binary" ValueType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-x509-token-profile-1.0#X509v3">MIIFZDCCBMygAwIBAgIUH3sX2xAwIWeSO74fAemxvcnMX2owDgYKKoMOAwoBAQIDAgUAMFgxSTBHBgNVBAMMQNKw0JvQotCi0KvSmiDQmtCj05jQm9CQ0J3QlNCr0KDQo9Co0Ksg0J7QoNCi0JDQm9Cr0pogKEdPU1QpIDIwMjIxCzAJBgNVBAYTAktaMB4XDTI0MDYxNDEwNDQ1N1oXDTI3MDYxNDEwNDQ1N1owggHKMR4wHAYKCZImiZPyLGQBAQwOMS4yLjM5OC41LjQ2LjExdzB1BgNVBAMMbtCg0LXQs9C40L7QvdCw0LvRjNC90LDRjyDQs9C10L7QuNC90YTQvtGA0LzQsNGG0LjQvtC90L3QsNGPINGB0LjRgdGC0LXQvNCwINCQ0YLRi9GA0LDRg9GB0LrQvtC5INC+0LHQu9Cw0YHRgtC4MQswCQYDVQQGEwJLWjGCAQYwggECBgNVBAoMgfrQmtC+0LzQvNGD0L3QsNC70YzQvdC+0LUg0LPQvtGB0YPQtNCw0YDRgdGC0LLQtdC90L3QvtC1INGD0YfRgNC10LbQtNC10L3QuNC1ICLQptC10L3RgtGAINGG0LjRhNGA0L7QstC40LfQsNGG0LjQuCDQkNGC0YvRgNCw0YPRgdC60L7QuSDQvtCx0LvQsNGB0YLQuCDQo9C/0YDQsNCy0LvQtdC90LjRjyDRhtC40YTRgNC+0LLQuNC30LDRhtC40Lgg0Lgg0LDRgNGF0LjQstC+0LIg0JDRgtGL0YDQsNGD0YHQutC+0Lkg0L7QsdC70LDRgdGC0LgiMRgwFgYDVQQLDA9CSU4xNTA5NDAwMDgxNzYwgawwIwYJKoMOAwoBAQICMBYGCiqDDgMKAQECAgEGCCqDDgMKAQMDA4GEAASBgBmJkAXXNp0GUdz5RYw2kikSgAnji7/7DjyX46iUFShCylw3dS59kzqtqf+KJ7UIF9wlmybT3+aD/tKz5PZopri9CShQrTLwdnnkgLWtsgnK1a0fcvTeguMklbY/pSR0rxa5Fx12GQUDPQQNzwbZovGFLvbvVU4Y9j9H01ry8qF6o4IBpjCCAaIwDgYDVR0PAQH/BAQDAgPIMB4GA1UdJQQXMBUGCCqDDgMDBAECBgkqgw4DAwQBAgYwOAYDVR0gBDEwLzAtBgYqgw4DAwIwIzAhBggrBgEFBQcCARYVaHR0cDovL3BraS5nb3Yua3ovY3BzMDgGA1UdHwQxMC8wLaAroCmGJ2h0dHA6Ly9jcmwucGtpLmdvdi5rei9uY2FfZ29zdF8yMDIyLmNybDA6BgNVHS4EMzAxMC+gLaArhilodHRwOi8vY3JsLnBraS5nb3Yua3ovbmNhX2RfZ29zdF8yMDIyLmNybDBoBggrBgEFBQcBAQRcMFowIgYIKwYBBQUHMAGGFmh0dHA6Ly9vY3NwLnBraS5nb3Yua3owNAYIKwYBBQUHMAKGKGh0dHA6Ly9wa2kuZ292Lmt6L2NlcnQvbmNhX2dvc3RfMjAyMi5jZXIwHQYDVR0OBBYEFA97F9sQMCFnkju+HwHpsb3JzF9qMB8GA1UdIwQYMBaAFP4wvp/IkGM/H/9aPAywyF9MbRcIMBYGBiqDDgMDBQQMMAoGCCqDDgMDBQEBMA4GCiqDDgMKAQECAwIFAAOBgQAfL/kIXf28rgCoTjQ8eGgVeDXeBK6TRdM+XeTVQPnls2UZmLhCXgRYNKJGSwQg5TkKnOdhjOPm0jLs3XzjJFyUdpZ9P4OSz4pfegRMh+rF/J5OaX4imij1oZuOYVTzzLFiVYfVDdpd7pNW7XoIAR7kxJT7BcVv/2eJrEOuvxTXJQ==</wsse:KeyIdentifier></wsse:SecurityTokenReference>
+</ds:KeyInfo>
+</ds:Signature></wsse:Security></SOAP-ENV:Header><soap:Body xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="id-4b091b41-d6b7-439b-9bac-2abc6aba9d94"><ns2:SendMessage xmlns:ns2="http://bip.bee.kz/SyncChannel/v10/Types" xmlns:ns8="http://egov.bee.kz/eds/tempstorage/v2/"><request><requestInfo><messageId>3ba3746c-752c-4295-96cf-2e3374e654dd</messageId><serviceId>EDS_TEMP_FILES</serviceId><messageDate>2025-06-05T15:39:45.321+06:00</messageDate><sender><senderId>*****</senderId><password>******</password></sender></requestInfo><requestData><data xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="ns8:TempStorageRequest"><ns8:type>DOWNLOAD</ns8:type><ns8:downloadRequest><ns8:fileIdentifiers>3828910d-c197-4cee-bb1c-3537080b44ea</ns8:fileIdentifiers></ns8:downloadRequest><ns8:credentials><ns8:senderId>*****</ns8:senderId><ns8:password>******</ns8:password></ns8:credentials></data></requestData></request></ns2:SendMessage></soap:Body></soap:Envelope>
