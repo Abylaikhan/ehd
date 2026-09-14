@@ -21,10 +21,11 @@ type Handler struct {
 	approval *application.ApprovalService
 	outgoing *application.OutgoingService
 	pdf      *application.PDFService
+	esedo    *application.ESEDOOutgoingService
 }
 
-func NewHandler(svc *application.Service, status *application.StatusService, notices *application.NoticeService, approval *application.ApprovalService, outgoing *application.OutgoingService, pdfSvc *application.PDFService) *Handler {
-	return &Handler{svc: svc, status: status, notices: notices, approval: approval, outgoing: outgoing, pdf: pdfSvc}
+func NewHandler(svc *application.Service, status *application.StatusService, notices *application.NoticeService, approval *application.ApprovalService, outgoing *application.OutgoingService, pdfSvc *application.PDFService, esedoSvc *application.ESEDOOutgoingService) *Handler {
+	return &Handler{svc: svc, status: status, notices: notices, approval: approval, outgoing: outgoing, pdf: pdfSvc, esedo: esedoSvc}
 }
 
 // mapErr — доменные ошибки → единый контракт ошибок (спеки 007/008).

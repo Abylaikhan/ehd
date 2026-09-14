@@ -20,6 +20,7 @@ import (
 	authrepo "ehd-api/internal/modules/auth/repository"
 	authhttp "ehd-api/internal/modules/auth/transport/http"
 	evgaapp "ehd-api/internal/modules/evga/application"
+	evgaesedo "ehd-api/internal/modules/evga/esedo"
 	evgarepo "ehd-api/internal/modules/evga/repository"
 	evgahttp "ehd-api/internal/modules/evga/transport/http"
 	reporterapp "ehd-api/internal/modules/reporter/application"
@@ -155,6 +156,7 @@ func Run(cfg *config.Config) error {
 	var evgaApprovalService *evgaapp.ApprovalService
 	var evgaOutgoingService *evgaapp.OutgoingService
 	var evgaPDFService *evgaapp.PDFService
+	var evgaESEDOService *evgaapp.ESEDOOutgoingService
 	if cfg.EVGA.Enabled() {
 		evgaDSN := cfg.EVGA.DSN
 		if !cfg.EVGA.WriteEnabled {
@@ -204,6 +206,29 @@ func Run(cfg *config.Config) error {
 			evgarepo.NewOutgoingRepo(evgaDB), evgaApprovalRepo, evgaRouteRepo,
 			evgaStatusRepo, evgaService, cfg.EVGA.WriteEnabled, log)
 		evgaPDFService = evgaapp.NewPDFService(evgaRepo, evgaService)
+
+		// отправка в ЕСЭДО (спека 014, вариант B). По умолчанию — StubSender (ничего не шлёт);
+		// при EVGA_ESEDO_ENABLED — SoapSender, но его транспорт до активации всё равно отключён.
+		esedoCfg := evgaesedo.Config{
+			Enabled:   cfg.EVGA.ESEDO.Enabled,
+			Endpoint:  cfg.EVGA.ESEDO.Endpoint,
+			SenderID:  cfg.EVGA.ESEDO.SenderID,
+			Password:  cfg.EVGA.ESEDO.Password,
+			ServiceID: cfg.EVGA.ESEDO.ServiceID,
+			RouteID:   cfg.EVGA.ESEDO.RouteID,
+			FromOrg:   cfg.EVGA.ESEDO.FromOrg,
+			CertPath:  cfg.EVGA.ESEDO.CertPath,
+		}
+		var esedoSender evgaesedo.Sender = evgaesedo.NewStubSender(log)
+		if esedoCfg.Enabled {
+			esedoSender = evgaesedo.NewSoapSender(esedoCfg, evgaesedo.StubSigner{}, log)
+			log.Info("evga: esedo sender = soap (транспорт отключён до активации)")
+		} else {
+			log.Info("evga: esedo sender = stub (отправка выключена)")
+		}
+		// TODO(активация): заменить StubSigner на реальную серверную подпись ГОСТ (NCANode).
+		evgaESEDOService = evgaapp.NewESEDOOutgoingService(
+			evgaRepo, evgaService, esedoSender, evgaesedo.StubSigner{}, esedoCfg, cfg.EVGA.WriteEnabled, log)
 	} else {
 		log.Info("evga: модуль выключен (EVGA_PG_DSN не задан)")
 	}
@@ -244,7 +269,7 @@ func Run(cfg *config.Config) error {
 	reporterhttp.Register(api.Group("/reporter"), reporterHandler, reporterGuard)
 	if evgaService != nil {
 		evgahttp.Register(api.Group("/evga"),
-			evgahttp.NewHandler(evgaService, evgaStatusService, evgaNoticeService, evgaApprovalService, evgaOutgoingService, evgaPDFService),
+			evgahttp.NewHandler(evgaService, evgaStatusService, evgaNoticeService, evgaApprovalService, evgaOutgoingService, evgaPDFService, evgaESEDOService),
 			evgahttp.NewGuard(authService))
 	}
 

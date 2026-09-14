@@ -108,6 +108,21 @@ type EVGA struct {
 	WriteEnabled  bool
 	WatchInterval time.Duration // вотчер регистрации исходящих (спека 011 FR-5); 0 — выключен
 	DeadlineWarn  int           // окно «истекающий срок» в днях (спека 013 FR-4); 0 — дефолт 3
+	ESEDO         EVGAESEDO     // отправка в ЕСЭДО (спека 014, заготовка; по умолчанию выключено)
+}
+
+// EVGAESEDO — реквизиты отправки исходящего в ЕСЭДО (ШЭП/ВШЭП). Заполняются после выдачи
+// учётки/сертификата (Бауыржан). Enabled=false по умолчанию — заготовка неактивна и ничего
+// не отправляет (спека 014). В рантайме пока не читается: клиент не подключён в composition root.
+type EVGAESEDO struct {
+	Enabled   bool
+	Endpoint  string
+	SenderID  string
+	Password  string
+	ServiceID string
+	RouteID   string
+	FromOrg   string
+	CertPath  string
 }
 
 // Enabled — модуль ЕВГА включён, если задан DSN внешней БД.
@@ -136,6 +151,9 @@ func New() (*Config, error) {
 	v.SetDefault("EVGA_WRITE_ENABLED", false)
 	v.SetDefault("EVGA_OUT_WATCH_INTERVAL", "60s")
 	v.SetDefault("EVGA_DEADLINE_WARN_DAYS", 3)
+	v.SetDefault("EVGA_ESEDO_ENABLED", false)
+	v.SetDefault("EVGA_ESEDO_SERVICE_ID", "ESEDO_UNIVERSAL_SERVICE")
+	v.SetDefault("EVGA_ESEDO_ROUTE_ID", "R_ESEDO")
 
 	cfg := &Config{
 		App:  App{Name: v.GetString("APP_NAME"), Env: v.GetString("APP_ENV")},
@@ -175,6 +193,16 @@ func New() (*Config, error) {
 			WriteEnabled:  v.GetBool("EVGA_WRITE_ENABLED"),
 			WatchInterval: v.GetDuration("EVGA_OUT_WATCH_INTERVAL"),
 			DeadlineWarn:  v.GetInt("EVGA_DEADLINE_WARN_DAYS"),
+			ESEDO: EVGAESEDO{
+				Enabled:   v.GetBool("EVGA_ESEDO_ENABLED"),
+				Endpoint:  v.GetString("EVGA_ESEDO_ENDPOINT"),
+				SenderID:  v.GetString("EVGA_ESEDO_SENDER_ID"),
+				Password:  v.GetString("EVGA_ESEDO_PASSWORD"),
+				ServiceID: v.GetString("EVGA_ESEDO_SERVICE_ID"),
+				RouteID:   v.GetString("EVGA_ESEDO_ROUTE_ID"),
+				FromOrg:   v.GetString("EVGA_ESEDO_FROM_ORG"),
+				CertPath:  v.GetString("EVGA_ESEDO_CERT_PATH"),
+			},
 		},
 	}
 

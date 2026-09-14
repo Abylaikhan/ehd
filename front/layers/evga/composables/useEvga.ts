@@ -139,6 +139,13 @@ export function useEvga() {
       `/api/v1/evga/notices/${noticeId}/out`,
     )
 
+  // Отправка в ЕСЭДО (backend-спека 014, вариант B; на заглушке — реально ничего не уходит)
+  const noticeSendESEDO = (noticeId: number) =>
+    api<{ accepted: boolean; message_id: string; note: string }>(
+      `/api/v1/evga/notices/${noticeId}/esedo-send`,
+      { method: 'POST' },
+    )
+
   // PDF уведомления по образцу (backend-спека 012): blob + скачивание браузером
   const noticePDF = async (noticeId: number) => {
     const res = await api.raw(`/api/v1/evga/notices/${noticeId}/pdf`, { responseType: 'blob' })
@@ -158,7 +165,7 @@ export function useEvga() {
     registry, card, references, exportRegistry, changeStatus, bulkStatus, history,
     noticePreview, noticeCreate, noticeList, noticeGet, noticeDelete, cliSearch,
     routeGet, routePut, participants, noticeSubmit, noticeApprove, noticeReject,
-    noticeOutgoing, noticeOut, noticePDF,
+    noticeOutgoing, noticeOut, noticePDF, noticeSendESEDO,
   }
 }
 

@@ -10,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"ehd-api/internal/modules/evga/domain"
+	"ehd-api/internal/modules/evga/esedo"
 	"ehd-api/pkg/httpserver"
 )
 
@@ -251,6 +252,25 @@ func (h *Handler) noticePDF(c *fiber.Ctx) error {
 	c.Set(fiber.HeaderContentType, "application/pdf")
 	c.Set(fiber.HeaderContentDisposition, `attachment; filename="`+name+`.pdf"`)
 	return c.Send(buf.Bytes())
+}
+
+// noticeSendESEDO — POST /notices/:id/esedo-send (спека 014, вариант B).
+// На заглушке реально в ЕСЭДО ничего не уходит; при активированном, но не готовом клиенте —
+// 503 ESEDO_NOT_ACTIVE (ErrDisabled/ErrNotConfigured/ErrTransportDisabled).
+func (h *Handler) noticeSendESEDO(c *fiber.Ctx) error {
+	id, err := noticeIDParam(c)
+	if err != nil {
+		return err
+	}
+	res, err := h.esedo.SendToESEDO(c.UserContext(), identityFrom(c), id)
+	if err != nil {
+		if errors.Is(err, esedo.ErrDisabled) || errors.Is(err, esedo.ErrNotConfigured) || errors.Is(err, esedo.ErrTransportDisabled) {
+			return httpserver.NewError(fiber.StatusServiceUnavailable, "ESEDO_NOT_ACTIVE",
+				"Отправка в ЕСЭДО пока не активирована (нет доступов ШЭП/сертификата)")
+		}
+		return mapApprovalErr(err)
+	}
+	return c.JSON(fiber.Map{"accepted": res.Accepted, "message_id": res.MessageID, "note": res.Note})
 }
 
 // deptUsers — GET /notices/:id/participants?q= (FR-3).
