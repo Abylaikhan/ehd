@@ -188,6 +188,11 @@ func Run(cfg *config.Config) error {
 		}
 		evgaService = evgaapp.NewService(evgaRepo, authService, log)
 		evgaService.SetDeadlineWarnDays(cfg.EVGA.DeadlineWarn) // спека 013 FR-4
+		// привязка «пользователь → департамент ДВГА» из админки живёт в БД ЕХД (спека 016 FR-1)
+		if err := evgarepo.MigrateUserDept(db); err != nil {
+			return err
+		}
+		evgaService.SetUserDeptRepo(evgarepo.NewUserDeptRepo(db))
 		evgaStatusRepo := evgarepo.NewStatusRepo(evgaDB)
 		evgaStatusService = evgaapp.NewStatusService(evgaStatusRepo, evgaService, cfg.EVGA.WriteEnabled, log)
 		evgaNoticeService = evgaapp.NewNoticeService(

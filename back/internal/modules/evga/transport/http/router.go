@@ -18,6 +18,10 @@ func Register(r fiber.Router, h *Handler, guard *Guard) {
 	user.Get("/registry/:id/history", h.history)
 	user.Get("/references", h.references)
 
+	// администрирование: привязка пользователя к департаменту ДВГА (спека 016)
+	user.Get("/admin/users/:uid/department", h.adminGetUserDept)
+	user.Put("/admin/users/:uid/department", h.adminSetUserDept)
+
 	// уведомления (спека 009); порядок: preview раньше :id
 	user.Post("/notices/preview", h.noticePreview)
 	user.Post("/notices", h.noticeCreate)
