@@ -45,6 +45,22 @@ for f in "$SCHEMA_DIR"/sample_*.csv; do
     || echo "  $t: пропущен (структура/дубликаты)"
 done
 
+# Миграции evga накатываем ПОСЛЕ сэмплов: 001 добавляет колонки (gu/gu_bin, notice_num_year),
+# 003 создаёт журнал статусов — без них код падает (column sn.gu does not exist).
+# Порядок важен: если добавить колонку до \copy, у CSV не совпадёт число колонок.
+# 004 (уникальный индекс снимка) пропускаем — в боевых данных есть дубли.
+MIG="$ROOT/back/migrations/evga"
+if [ -d "$MIG" ]; then
+  echo "==> Миграции evga (структура под код; 004 пропускаем)"
+  for m in 001_notice_snapshot_and_counter_fields 002_risk_status_trash 003_status_log 005_notice_number_unique; do
+    if "${COMPOSE[@]}" exec -T postgres psql -U "$DB_USER" -d obm_evga -v ON_ERROR_STOP=1 -q < "$MIG/$m.sql" >/dev/null 2>&1; then
+      echo "  $m: ok"
+    else
+      echo "  $m: пропущен (дубли/конфликт — не критично для dev)"
+    fi
+  done
+fi
+
 echo "==> Выравнивание сиквенсов (сэмплы вставлены с явными id)"
 "${COMPOSE[@]}" exec -T postgres psql -U "$DB_USER" -d obm_evga -q <<'SQL'
 do $$
@@ -65,6 +81,13 @@ begin
   end loop;
 end $$;
 SQL
+
+SEED="$(cd "$(dirname "$0")" && pwd)/dev_seed.sql"
+if [ -f "$SEED" ]; then
+  echo "==> Сид тестовых пользователей (ИИН-маппинг)"
+  "${COMPOSE[@]}" exec -T postgres psql -U "$DB_USER" -d obm_evga -v ON_ERROR_STOP=1 -q < "$SEED" \
+    | grep -a "dev_seed:" || true
+fi
 
 echo "Готово. DSN для локальной разработки:"
 echo "  postgres://$DB_USER:<пароль ehd>@localhost:5433/obm_evga?sslmode=disable   # хост-порт см. docker-compose"

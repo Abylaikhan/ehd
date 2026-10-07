@@ -31,6 +31,8 @@ func Register(r fiber.Router, h *Handler, guard *Guard) {
 	user.Put("/notices/:id/route", h.routePut)
 	user.Get("/notices/:id/participants", h.deptUsers)
 	user.Post("/notices/:id/submit", h.noticeSubmit)
+	// challenge на подпись раньше самого approve (спека 015)
+	user.Post("/notices/:id/approve/challenge", h.noticeApproveChallenge)
 	user.Post("/notices/:id/approve", h.noticeApprove)
 	user.Post("/notices/:id/reject", h.noticeReject)
 

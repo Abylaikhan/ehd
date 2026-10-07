@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<!-- Урезание памяти ClickHouse для маленького VPS (1.9GB RAM, демо-данные Reporter).
+     Отключаем тяжёлые системные лог-таблицы (растут и валят слияния по памяти) + урезаем кэши. -->
+<clickhouse>
+    <!-- слушать все интерфейсы: наш bind-mount config.d перекрывает docker_related_config.xml образа,
+         в котором это было задано; без этого CH слушает только loopback и api его не достаёт -->
+    <listen_host>0.0.0.0</listen_host>
+
+    <mark_cache_size>67108864</mark_cache_size>
+    <uncompressed_cache_size>0</uncompressed_cache_size>
+    <mmap_cache_size>0</mmap_cache_size>
+    <compiled_expression_cache_size>0</compiled_expression_cache_size>
+    <max_server_memory_usage_to_ram_ratio>0.8</max_server_memory_usage_to_ram_ratio>
+
+    <!-- системные логи не нужны для демо-Reporter и жрут память/диск -->
+    <metric_log remove="1"/>
+    <asynchronous_metric_log remove="1"/>
+    <trace_log remove="1"/>
+    <query_thread_log remove="1"/>
+    <query_views_log remove="1"/>
+    <part_log remove="1"/>
+    <session_log remove="1"/>
+    <text_log remove="1"/>
+    <crash_log remove="1"/>
+    <opentelemetry_span_log remove="1"/>
+    <processors_profile_log remove="1"/>
+    <error_log remove="1"/>
+    <query_log remove="1"/>
+</clickhouse>

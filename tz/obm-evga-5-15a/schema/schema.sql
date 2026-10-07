@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict gUh1eXjbVcFEWPmviBqTU8MY9yDEq3kf4MLyP0YgZJ4FavL7vapoJKe3EYemSny
+\restrict L2M0Ik60ICYfDRE7yvi2IUQui9DxgkfbtA0POlPrSU0EyajSss95L0Y6yLvMzWn
 
 -- Dumped from database version 16.1
 -- Dumped by pg_dump version 18.6
@@ -73693,27 +73693,33 @@ ALTER SEQUENCE public.its_r_station_id_seq OWNED BY public.its_r_station.id;
 CREATE TABLE public.its_r_teacher (
     "in$trash" smallint,
     "sys$uuid" character varying(36) DEFAULT public.uuid_generate_v4(),
-    title character varying(250),
+    title character varying(1000),
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     created_by bigint,
     code character varying(37),
     id bigint NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    title_kk character varying(250),
+    title_kk character varying(1000),
     id_number character varying(250),
     employmentdate date,
     totalworkexperience character varying(250),
-    totalpedagogicalworkexperience character varying(250),
+    totalpedagogicalworkexperience character varying(500),
     terminationdate date,
     schoolbin character varying(250),
-    schoolfullname character varying(250),
-    teacherfirstname character varying(250),
-    teachermiddlename character varying(250),
+    schoolfullname character varying(500),
+    teacherfirstname character varying(500),
+    teachermiddlename character varying(500),
     areacode character varying(250),
     locationcode character varying(250),
     regioncode character varying(250),
-    teacherlastname character varying(250),
-    iin character varying(15)
+    teacherlastname character varying(500),
+    iin character varying(15),
+    cat_en character varying(500),
+    cat_ru character varying(500),
+    pos_kk character varying(500),
+    cat_kk character varying(500),
+    pos_en character varying(500),
+    pos_ru character varying(500)
 );
 
 
@@ -78493,7 +78499,9 @@ CREATE TABLE public.its_risk_notice (
     its_activity_id bigint,
     signer_id bigint,
     signer_date timestamp with time zone,
-    staff_id character varying(250)
+    staff_id character varying(250),
+    year character varying(250),
+    month character varying(250)
 );
 
 
@@ -78689,7 +78697,8 @@ CREATE TABLE public.its_risk_profile (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     title_kk character varying(250),
     query_text text,
-    risk_desc text
+    risk_desc text,
+    is_true smallint
 );
 
 
@@ -80754,7 +80763,8 @@ CREATE TABLE public.its_tb_5_15a (
     exec character varying(250),
     its_out_id character varying(500),
     its_in_id character varying(500),
-    its_risk_id character varying(500)
+    its_risk_id character varying(500),
+    gu_bool smallint
 );
 
 
@@ -88990,6 +89000,35 @@ CREATE TABLE public.tb_5_15_121_161_322 (
     god character varying,
     mes character varying,
     gu_bin character varying
+);
+
+
+--
+-- Name: tb_5_15aobm; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.tb_5_15aobm (
+    ppo_pp text NOT NULL,
+    ppo integer NOT NULL,
+    its_risk_profile_id integer NOT NULL,
+    its_risk_status_id integer NOT NULL,
+    region text NOT NULL,
+    kato text NOT NULL,
+    sendername text NOT NULL,
+    gu text NOT NULL,
+    fm text NOT NULL,
+    nm text NOT NULL,
+    ft text NOT NULL,
+    iin text NOT NULL,
+    paymentdate date NOT NULL,
+    description text NOT NULL,
+    specific text NOT NULL,
+    la1 text NOT NULL,
+    amount double precision NOT NULL,
+    amount_part double precision NOT NULL,
+    god integer NOT NULL,
+    mes bigint NOT NULL,
+    gu_bin text NOT NULL
 );
 
 
@@ -208476,5 +208515,5 @@ ALTER TABLE ONLY public.work_type
 -- PostgreSQL database dump complete
 --
 
-\unrestrict gUh1eXjbVcFEWPmviBqTU8MY9yDEq3kf4MLyP0YgZJ4FavL7vapoJKe3EYemSny
+\unrestrict L2M0Ik60ICYfDRE7yvi2IUQui9DxgkfbtA0POlPrSU0EyajSss95L0Y6yLvMzWn
 

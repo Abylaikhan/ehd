@@ -15,13 +15,13 @@ const { data: preview, pending, error, refresh } = useLazyAsyncData(
   { server: false, immediate: ids.length > 0 },
 )
 
-// состояние групп: исключение + выбранный адресат (ключ — gu)
-const groupState = ref<Record<string, { excluded: boolean; cli: EvgaCliOrg | null }>>({})
+// состояние групп: исключение + выбранные адресаты (ключ — gu; несколько адресатов на уведомление)
+const groupState = ref<Record<string, { excluded: boolean; cli: EvgaCliOrg[] }>>({})
 watch(
   preview,
   (p) => {
     const next: typeof groupState.value = {}
-    for (const g of p?.groups ?? []) next[g.gu] = groupState.value[g.gu] ?? { excluded: false, cli: null }
+    for (const g of p?.groups ?? []) next[g.gu] = groupState.value[g.gu] ?? { excluded: false, cli: [] }
     groupState.value = next
   },
   { immediate: true },
@@ -34,7 +34,7 @@ const createEnabled = computed(() => {
   const states: GroupState[] = groups.value.map((g) => ({
     gu: g.gu,
     excluded: groupState.value[g.gu]?.excluded ?? false,
-    cliId: groupState.value[g.gu]?.cli?.id ?? null,
+    cliIds: (groupState.value[g.gu]?.cli ?? []).map((c) => c.id),
   }))
   return canCreate(states)
 })
@@ -58,7 +58,7 @@ async function submit() {
     .filter((g) => !groupState.value[g.gu]?.excluded)
     .map((g) => ({
       record_ids: g.records.map((r) => r.id),
-      its_cli_id: groupState.value[g.gu]!.cli!.id,
+      its_cli_ids: groupState.value[g.gu]!.cli.map((c) => c.id),
     }))
   creating.value = true
   actionError.value = ''
@@ -80,7 +80,7 @@ const fmtAmount = (v: string) => {
 
 <template>
   <div>
-    <PageHeader title="Формирование уведомлений" description="Записи сгруппированы по коду ГУ. Каждая группа — отдельное уведомление; выберите адресата из справочника ЕСЭДО.">
+    <PageHeader title="Формирование уведомлений" description="Записи сгруппированы по коду ГУ. Каждая группа — отдельное уведомление; выберите одного или нескольких адресатов из справочника ЕСЭДО.">
       <template #actions>
         <NuxtLink to="/evga"><Button label="К реестру" icon="pi pi-arrow-left" text /></NuxtLink>
       </template>
@@ -133,10 +133,11 @@ const fmtAmount = (v: string) => {
               <Column header="Общая сумма" class="num" :style="{ width: '10rem' }">
                 <template #body="{ data: g }">{{ fmtAmount(g.total_sum) }}</template>
               </Column>
-              <Column header="Адресат (ЕСЭДО)" :style="{ minWidth: '22rem' }">
+              <Column header="Адресаты (ЕСЭДО)" :style="{ minWidth: '22rem' }">
                 <template #body="{ data: g }">
                   <AutoComplete
                     v-model="groupState[g.gu]!.cli"
+                    multiple
                     :suggestions="cliSuggestions"
                     option-label="title"
                     placeholder="Поиск по наименованию или коду…"

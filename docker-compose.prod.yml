@@ -1,0 +1,141 @@
+name: ehd2-prod
+
+# Production-стек ЕХД: self-contained (собственные Postgres + ClickHouse с демо-данными),
+# за nginx с TLS. Боевой ClickHouse (10.58.56.50) и EVGA PG (10.58.57.39) из этой сети
+# недоступны, поэтому Reporter работает на демо-витрине, а модуль EVGA ВЫКЛЮЧЕН.
+# Секреты — в .env.prod (в репозиторий не коммитится). Домены: ehd.makeit.kz / apiehd.makeit.kz.
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    # Порт слушает только loopback сервера: наружу БД с ПДн не торчит.
+    # Доступ с ноутбука — через SSH-туннель:
+    #   ssh -L 5433:127.0.0.1:5432 root@188.241.217.161
+    # затем подключаться на localhost:5433
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - chdata:/var/lib/clickhouse
+      - ./infra/clickhouse/init:/docker-entrypoint-initdb.d:ro
+      - ./infra/clickhouse/config.d:/etc/clickhouse-server/config.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping | grep -q Ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  ehd-api:
+    build:
+      context: ./back
+      target: prod
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      HTTP_PORT: "8080"
+      LOG_LEVEL: info
+      PG_DSN: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      CH_ADDR: clickhouse:9000
+      CH_DB: ${CLICKHOUSE_SRC_DB}
+      CH_USER: ${CLICKHOUSE_RO_USER}
+      CH_PASSWORD: ${CLICKHOUSE_RO_PASSWORD}
+      ADMIN_LOGIN: ${ADMIN_LOGIN}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      AUTH_ENC_KEY: ${AUTH_ENC_KEY}
+      AUTH_HMAC_KEY: ${AUTH_HMAC_KEY}
+      SESSION_TTL: ${SESSION_TTL:-3h}
+      TEMP_PASSWORD_TTL: ${TEMP_PASSWORD_TTL:-72h}
+      MAX_FAILED_ATTEMPTS: ${MAX_FAILED_ATTEMPTS:-3}
+      # TLS терминируется на nginx → cookie сессии помечаем Secure
+      COOKIE_SECURE: "true"
+      # Модуль ОБМ ЕВГА: read-only копия obm_evga в этом же Postgres (залита из dev-реплики).
+      # Пусто — модуль выключен. WRITE=false навязывает read-only сессию; отправка в ЕСЭДО off (sender=stub).
+      EVGA_PG_DSN: ${EVGA_PG_DSN:-}
+      EVGA_WRITE_ENABLED: ${EVGA_WRITE_ENABLED:-false}
+      # ЭЦП согласующего при подписании уведомления (спека 015): требует EDS_MODE != stub
+      EVGA_APPROVE_EDS: ${EVGA_APPROVE_EDS:-false}
+      # ЭЦП: stub (sandbox) | ncalayer (RSA) | ncanode (RSA+ГОСТ РК через сайдкар NCANode).
+      EDS_MODE: ${EDS_MODE:-stub}
+      EDS_TRUST_DIR: /app/eds-trust
+      EDS_OCSP_ENABLED: ${EDS_OCSP_ENABLED:-true}
+      NCANODE_URL: http://ncanode:14579
+    volumes:
+      - ./infra/eds-trust:/app/eds-trust:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      ncanode:
+        condition: service_started
+
+  ehd-web:
+    build:
+      context: ./front
+      target: prod
+    restart: unless-stopped
+    environment:
+      # SSR обращается к API напрямую по внутренней сети compose
+      NUXT_API_BASE: http://ehd-api:8080
+      # режим ЭЦП фронта синхронизирован с бэкендом; !=stub включает реальный NCALayer-флоу
+      NUXT_PUBLIC_EDS_MODE: ${EDS_MODE:-stub}
+    depends_on:
+      - ehd-api
+
+  # Сайдкар проверки ЭЦП (Kalkan): RSA + ГОСТ РК. Нужен при EDS_MODE=ncanode.
+  # Только внутренняя сеть compose (порт наружу не публикуем).
+  ncanode:
+    image: malikzh/ncanode
+    restart: unless-stopped
+    # ограничиваем heap JVM, чтобы освободить RAM для ClickHouse на маленьком VPS
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xmx320m -Xms64m"
+    volumes:
+      - ncanode_cache:/app/cache
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:14579/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/conf.d:/etc/nginx/conf.d
+      - ./infra/nginx/certbot-www:/var/www/certbot
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - ehd-web
+      - ehd-api
+
+volumes:
+  pgdata:
+  chdata:
+  ncanode_cache:

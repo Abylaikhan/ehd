@@ -106,9 +106,15 @@ func (s *NoticeService) Create(ctx context.Context, id contract.Identity, groups
 	}
 	total := 0
 	for _, g := range groups {
-		if g.CliID <= 0 {
-			// кнопка «Создать» неактивна без адресата (EVGA-FR-034) — сервер дублирует проверку
+		// кнопка «Создать» неактивна без адресата (EVGA-FR-034) — сервер дублирует проверку.
+		// Поддерживается несколько адресатов на одно уведомление.
+		if len(g.CliIDs) == 0 {
 			return CreateResult{}, domain.ErrAddresseeRequired
+		}
+		for _, cid := range g.CliIDs {
+			if cid <= 0 {
+				return CreateResult{}, domain.ErrAddresseeRequired
+			}
 		}
 		total += len(g.RecordIDs)
 	}

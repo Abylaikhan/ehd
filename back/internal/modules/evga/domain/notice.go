@@ -59,9 +59,10 @@ type NoticeGroup struct {
 }
 
 // CreateGroupInput — подтверждённая группа для создания (spec 009 FR-4).
+// CliIDs — один или несколько адресатов ЕСЭДО на уведомление (its_risk_notice_recepient, nn=1..N).
 type CreateGroupInput struct {
 	RecordIDs []int64
-	CliID     int64
+	CliIDs    []int64
 }
 
 // CreatedNotice — результат создания одной группы.

@@ -109,6 +109,9 @@ type EVGA struct {
 	WatchInterval time.Duration // вотчер регистрации исходящих (спека 011 FR-5); 0 — выключен
 	DeadlineWarn  int           // окно «истекающий срок» в днях (спека 013 FR-4); 0 — дефолт 3
 	ESEDO         EVGAESEDO     // отправка в ЕСЭДО (спека 014, заготовка; по умолчанию выключено)
+	// ApproveEDS — требовать ЭЦП согласующего при подписании уведомления (спека 015 FR-5).
+	// false (по умолчанию) — прежнее поведение: approve меняет только статус маршрута.
+	ApproveEDS bool
 }
 
 // EVGAESEDO — реквизиты отправки исходящего в ЕСЭДО (ШЭП/ВШЭП). Заполняются после выдачи
@@ -152,6 +155,7 @@ func New() (*Config, error) {
 	v.SetDefault("EVGA_OUT_WATCH_INTERVAL", "60s")
 	v.SetDefault("EVGA_DEADLINE_WARN_DAYS", 3)
 	v.SetDefault("EVGA_ESEDO_ENABLED", false)
+	v.SetDefault("EVGA_APPROVE_EDS", false)
 	v.SetDefault("EVGA_ESEDO_SERVICE_ID", "ESEDO_UNIVERSAL_SERVICE")
 	v.SetDefault("EVGA_ESEDO_ROUTE_ID", "R_ESEDO")
 
@@ -193,6 +197,7 @@ func New() (*Config, error) {
 			WriteEnabled:  v.GetBool("EVGA_WRITE_ENABLED"),
 			WatchInterval: v.GetDuration("EVGA_OUT_WATCH_INTERVAL"),
 			DeadlineWarn:  v.GetInt("EVGA_DEADLINE_WARN_DAYS"),
+			ApproveEDS:    v.GetBool("EVGA_APPROVE_EDS"),
 			ESEDO: EVGAESEDO{
 				Enabled:   v.GetBool("EVGA_ESEDO_ENABLED"),
 				Endpoint:  v.GetString("EVGA_ESEDO_ENDPOINT"),

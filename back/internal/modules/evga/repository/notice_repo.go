@@ -210,7 +210,7 @@ func (nr *NoticeRepo) CreateNotices(
 			}
 			// сервер перегруппирует сам: на каждую фактическую группу ГУ — своё уведомление (FR-4)
 			for _, grp := range groupByGU(valid) {
-				noticeID, err := nr.insertNotice(tx, grp, g.CliID, ownerDeptID, createdBy, noticeTxt)
+				noticeID, err := nr.insertNotice(tx, grp, g.CliIDs, ownerDeptID, createdBy, noticeTxt)
 				if err != nil {
 					return err
 				}
@@ -225,8 +225,8 @@ func (nr *NoticeRepo) CreateNotices(
 	return created, rejected, nil
 }
 
-// insertNotice — заявка + шапка + снимок + адресат для одной группы (FR-5).
-func (nr *NoticeRepo) insertNotice(tx *gorm.DB, grp domain.NoticeGroup, cliID int64, deptID int64, createdBy *int64, noticeTxt string) (int64, error) {
+// insertNotice — заявка + шапка + снимок + адресат(ы) для одной группы (FR-5).
+func (nr *NoticeRepo) insertNotice(tx *gorm.DB, grp domain.NoticeGroup, cliIDs []int64, deptID int64, createdBy *int64, noticeTxt string) (int64, error) {
 	now := time.Now()
 
 	// заявка платформы: статус «Проект создан», номер не присваивается (фаза 6)
@@ -276,12 +276,14 @@ func (nr *NoticeRepo) insertNotice(tx *gorm.DB, grp domain.NoticeGroup, cliID in
 		return 0, err
 	}
 
-	// адресат (EVGA-FR-039)
-	if err := tx.Exec(
-		`insert into its_risk_notice_recepient (its_risk_notice_id, its_cli_id, nn) values (?, ?, 1)`,
-		notice.ID, cliID,
-	).Error; err != nil {
-		return 0, err
+	// адресат(ы) (EVGA-FR-039): один или несколько получателей, nn = 1..N
+	for i, cliID := range cliIDs {
+		if err := tx.Exec(
+			`insert into its_risk_notice_recepient (its_risk_notice_id, its_cli_id, nn) values (?, ?, ?)`,
+			notice.ID, cliID, i+1,
+		).Error; err != nil {
+			return 0, err
+		}
 	}
 	return notice.ID, nil
 }
@@ -306,12 +308,10 @@ const noticeListJoins = `
 		 where sn.its_risk_notice_id = n.id and sn."in$trash" is null
 	) agg on true
 	left join lateral (
-		select c.title
+		select string_agg(c.title, ', ' order by r.nn nulls last, r.id) as title
 		  from its_risk_notice_recepient r
 		  join its_cli c on c.id = r.its_cli_id
 		 where r.its_risk_notice_id = n.id and r."in$trash" is null
-		 order by r.nn nulls last, r.id
-		 limit 1
 	) rc on true`
 
 type noticeListRow struct {

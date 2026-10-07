@@ -83,7 +83,8 @@ func (h *Handler) noticePreview(c *fiber.Ctx) error {
 type createNoticesReq struct {
 	Groups []struct {
 		RecordIDs []int64 `json:"record_ids"`
-		CliID     int64   `json:"its_cli_id"`
+		CliID     int64   `json:"its_cli_id"`  // обратная совместимость: один адресат
+		CliIDs    []int64 `json:"its_cli_ids"` // несколько адресатов на уведомление
 	} `json:"groups"`
 }
 
@@ -96,7 +97,11 @@ func (h *Handler) noticeCreate(c *fiber.Ctx) error {
 	}
 	groups := make([]domain.CreateGroupInput, len(req.Groups))
 	for i, g := range req.Groups {
-		groups[i] = domain.CreateGroupInput{RecordIDs: g.RecordIDs, CliID: g.CliID}
+		cliIDs := g.CliIDs
+		if len(cliIDs) == 0 && g.CliID > 0 {
+			cliIDs = []int64{g.CliID}
+		}
+		groups[i] = domain.CreateGroupInput{RecordIDs: g.RecordIDs, CliIDs: cliIDs}
 	}
 	res, err := h.notices.Create(c.UserContext(), identityFrom(c), groups)
 	if err != nil {
