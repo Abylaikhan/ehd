@@ -31,6 +31,13 @@ type IINProvider interface {
 	UserIIN(ctx context.Context, userID string) (iin string, verified bool, err error)
 }
 
+// UserDeptPort — привязка «пользователь ЕХД → департамент ДВГА» в БД ЕХД (спека 016 FR-1).
+type UserDeptPort interface {
+	Get(ctx context.Context, userID string) (*int64, error)
+	Set(ctx context.Context, userID string, departmentID int64) error
+	Clear(ctx context.Context, userID string) error
+}
+
 const scopeCacheTTL = 15 * time.Minute // spec FR-3
 
 type scopeEntry struct {
@@ -45,10 +52,15 @@ type Service struct {
 	log      *zap.Logger
 	now      func() time.Time
 	warnDays int // окно «истекающий» для подсветки сроков (EVGA-FR-080)
+	// переопределение департамента из админки (спека 016); nil — функция не подключена
+	userDept UserDeptPort
 
 	mu    sync.RWMutex
 	cache map[string]scopeEntry // userID → scope
 }
+
+// SetUserDeptRepo подключает хранилище привязок «пользователь → департамент» (спека 016).
+func (s *Service) SetUserDeptRepo(r UserDeptPort) { s.userDept = r }
 
 func NewService(repo Repo, iin IINProvider, log *zap.Logger) *Service {
 	return &Service{
@@ -104,17 +116,32 @@ func (s *Service) Scope(ctx context.Context, id contract.Identity) (domain.Depar
 	s.mu.RUnlock()
 
 	scope := domain.DepartmentScope{Unmapped: true}
-	iin, verified, err := s.iin.UserIIN(ctx, id.UserID)
-	if err != nil {
-		return domain.DepartmentScope{}, err
-	}
-	if verified && iin != "" {
-		deptID, title, err := s.repo.DepartmentByUserIIN(ctx, iin)
-		if err != nil {
-			return domain.DepartmentScope{}, s.wrapSourceErr(ctx, err)
-		}
-		if deptID != nil {
+
+	// 1) переопределение из админки имеет приоритет над резолвом по ИИН (спека 016 FR-2)
+	if s.userDept != nil {
+		if deptID, err := s.userDept.Get(ctx, id.UserID); err == nil && deptID != nil {
+			title, err := s.departmentTitle(ctx, *deptID)
+			if err != nil {
+				return domain.DepartmentScope{}, s.wrapSourceErr(ctx, err)
+			}
 			scope = domain.DepartmentScope{DepartmentID: deptID, DepartmentTitle: title}
+		}
+	}
+
+	// 2) иначе — прежний резолв по ИИН из obm_evga.users (spec 007 FR-3)
+	if scope.Unmapped {
+		iin, verified, err := s.iin.UserIIN(ctx, id.UserID)
+		if err != nil {
+			return domain.DepartmentScope{}, err
+		}
+		if verified && iin != "" {
+			deptID, title, err := s.repo.DepartmentByUserIIN(ctx, iin)
+			if err != nil {
+				return domain.DepartmentScope{}, s.wrapSourceErr(ctx, err)
+			}
+			if deptID != nil {
+				scope = domain.DepartmentScope{DepartmentID: deptID, DepartmentTitle: title}
+			}
 		}
 	}
 	if scope.Unmapped {
@@ -126,6 +153,71 @@ func (s *Service) Scope(ctx context.Context, id contract.Identity) (domain.Depar
 	s.cache[id.UserID] = scopeEntry{scope: scope, exp: s.now().Add(scopeCacheTTL)}
 	s.mu.Unlock()
 	return scope, nil
+}
+
+// departmentTitle — название департамента ДВГА по id (из справочника obm_evga).
+func (s *Service) departmentTitle(ctx context.Context, deptID int64) (string, error) {
+	deps, err := s.repo.Departments(ctx)
+	if err != nil {
+		return "", err
+	}
+	for _, d := range deps {
+		if d.ID == deptID {
+			return d.Title, nil
+		}
+	}
+	return "", nil
+}
+
+// invalidateScope — сбросить кэш области пользователя (спека 016 FR-4).
+func (s *Service) invalidateScope(userID string) {
+	s.mu.Lock()
+	delete(s.cache, userID)
+	s.mu.Unlock()
+}
+
+// UserDepartment — текущая привязка пользователя (спека 016 FR-3, только админ).
+func (s *Service) UserDepartment(ctx context.Context, actor contract.Identity, userID string) (*int64, error) {
+	if !actor.IsAdmin {
+		return nil, ErrCuratorReadOnly
+	}
+	if s.userDept == nil {
+		return nil, nil
+	}
+	return s.userDept.Get(ctx, userID)
+}
+
+// SetUserDepartment — назначить (deptID != nil) или снять (nil) привязку (спека 016 FR-3/FR-4).
+func (s *Service) SetUserDepartment(ctx context.Context, actor contract.Identity, userID string, deptID *int64) error {
+	if !actor.IsAdmin {
+		return ErrCuratorReadOnly
+	}
+	if s.userDept == nil {
+		return domain.ErrNotFound
+	}
+	if deptID == nil {
+		if err := s.userDept.Clear(ctx, userID); err != nil {
+			return err
+		}
+		s.invalidateScope(userID)
+		s.log.Info("evga: привязка к департаменту снята", zap.String("user_id", userID))
+		return nil
+	}
+	// департамент должен существовать в справочнике obm_evga
+	title, err := s.departmentTitle(ctx, *deptID)
+	if err != nil {
+		return s.wrapSourceErr(ctx, err)
+	}
+	if title == "" {
+		return domain.ErrInvalidSort // INVALID_FILTER: неизвестный департамент
+	}
+	if err := s.userDept.Set(ctx, userID, *deptID); err != nil {
+		return err
+	}
+	s.invalidateScope(userID)
+	s.log.Info("evga: пользователь привязан к департаменту",
+		zap.String("user_id", userID), zap.Int64("department_id", *deptID))
+	return nil
 }
 
 // wrapSourceErr — ошибки связности внешней БД транслируются в ErrSourceUnavailable (503).
