@@ -22,3 +22,11 @@ graphify-out/
 infra/eds-trust/*
 !infra/eds-trust/README.md
 !infra/eds-trust/.gitkeep
+
+# Production env (секреты) и рабочие каталоги деплоя
+.env.prod
+infra/nginx/certbot-www/*
+!infra/nginx/certbot-www/.gitkeep
+
+# Postman-коллекция содержит прод-пароли — не коммитим
+postman/

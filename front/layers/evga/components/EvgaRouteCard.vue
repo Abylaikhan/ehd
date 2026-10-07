@@ -12,6 +12,8 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'changed'): void }>()
 
 const evga = useEvga()
+// режим ЭЦП: 'stub' — подпись не требуется; 'ncalayer'/'ncanode' — подписываем в NCALayer
+const edsMode = useRuntimeConfig().public.edsMode as string
 
 const { data: route, refresh: refreshRoute } = useLazyAsyncData(
   `evga-route-${props.noticeId}`,
@@ -124,16 +126,25 @@ async function createOutgoing() {
 const rejectDialog = ref(false)
 const rejectComment = ref('')
 
+// Подписание согласующим (backend-спека 015): при режиме ЭЦП запрашиваем challenge,
+// подписываем его в NCALayer и отправляем CMS вместе с approve.
 async function approve() {
   busy.value = true
   error.value = ''
   try {
-    await evga.noticeApprove(props.noticeId)
+    if (edsMode !== 'stub') {
+      const { challenge } = await evga.approveChallenge(props.noticeId)
+      const cms = await useNcaLayer().signChallenge(btoa(challenge))
+      await evga.noticeApprove(props.noticeId, undefined, challenge, cms)
+    } else {
+      await evga.noticeApprove(props.noticeId)
+    }
     info.value = 'Уведомление согласовано и подписано'
     refreshRoute()
     emit('changed')
   } catch (e) {
-    error.value = apiErrorMessage(e)
+    // ошибка NCALayer (не запущен/отмена) либо отказ проверки подписи на бэкенде
+    error.value = (e as { data?: unknown })?.data ? apiErrorMessage(e) : ncaErrorMessage(e)
   } finally {
     busy.value = false
   }

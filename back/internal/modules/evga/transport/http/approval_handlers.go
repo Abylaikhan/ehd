@@ -28,6 +28,16 @@ func mapApprovalErr(err error) error {
 			httpserver.ErrorDetail{Field: "comment", Reason: "required"})
 	case errors.Is(err, domain.ErrNumberingUnavailable):
 		return httpserver.NewError(fiber.StatusUnprocessableEntity, "NUMBERING_UNAVAILABLE", err.Error())
+	// подписание согласующим (спека 015)
+	case errors.Is(err, domain.ErrSignatureRequired):
+		return httpserver.NewError(fiber.StatusUnprocessableEntity, "EDS_SIGNATURE_REQUIRED", err.Error(),
+			httpserver.ErrorDetail{Field: "signed_data", Reason: "required"})
+	case errors.Is(err, domain.ErrChallengeInvalid):
+		return httpserver.NewError(fiber.StatusUnprocessableEntity, "EDS_CHALLENGE_INVALID", err.Error())
+	case errors.Is(err, domain.ErrSignatureInvalid):
+		return httpserver.NewError(fiber.StatusUnprocessableEntity, "EDS_VERIFICATION_FAILED", err.Error())
+	case errors.Is(err, domain.ErrSignerMismatch):
+		return httpserver.NewError(fiber.StatusUnprocessableEntity, "EDS_SIGNER_MISMATCH", err.Error())
 	default:
 		return mapErr(err)
 	}
@@ -54,6 +64,9 @@ type routeStepResp struct {
 	Comment      string  `json:"comment"`
 	OpenedAt     *string `json:"opened_at"`
 	ClosedAt     *string `json:"closed_at"`
+	// подпись согласующего (спека 015 FR-4): сам CMS наружу не отдаётся
+	Signed   bool    `json:"signed"`
+	SignedAt *string `json:"signed_at"`
 }
 
 func toRouteStepResp(s domain.RouteStep) routeStepResp {
@@ -69,6 +82,7 @@ func toRouteStepResp(s domain.RouteStep) routeStepResp {
 		AssigneeID: s.AssigneeObmID, AssigneeName: s.AssigneeName,
 		Status: s.Status, Result: s.Result, Comment: s.Comment,
 		OpenedAt: fmtT(s.OpenedAt), ClosedAt: fmtT(s.ClosedAt),
+		Signed:   s.SignedAt != nil, SignedAt: fmtT(s.SignedAt),
 	}
 }
 
@@ -133,15 +147,35 @@ type commentReq struct {
 	Comment string `json:"comment"`
 }
 
-// noticeApprove — POST /notices/:id/approve (FR-5).
+// approveReq — согласование с подписью согласующего (спека 015 FR-2).
+type approveReq struct {
+	Comment    string `json:"comment"`
+	Challenge  string `json:"challenge"`
+	SignedData string `json:"signed_data"`
+}
+
+// noticeApproveChallenge — POST /notices/:id/approve/challenge (спека 015 FR-1).
+func (h *Handler) noticeApproveChallenge(c *fiber.Ctx) error {
+	id, err := noticeIDParam(c)
+	if err != nil {
+		return err
+	}
+	ch, err := h.approval.ApproveChallenge(c.UserContext(), identityFrom(c), id)
+	if err != nil {
+		return mapApprovalErr(err)
+	}
+	return c.JSON(fiber.Map{"challenge": ch})
+}
+
+// noticeApprove — POST /notices/:id/approve (FR-5; подпись — спека 015).
 func (h *Handler) noticeApprove(c *fiber.Ctx) error {
 	id, err := noticeIDParam(c)
 	if err != nil {
 		return err
 	}
-	var req commentReq
+	var req approveReq
 	_ = c.BodyParser(&req)
-	if err := h.approval.Approve(c.UserContext(), identityFrom(c), id, req.Comment); err != nil {
+	if err := h.approval.Approve(c.UserContext(), identityFrom(c), id, req.Comment, req.Challenge, req.SignedData); err != nil {
 		return mapApprovalErr(err)
 	}
 	return c.JSON(fiber.Map{"approved": true})

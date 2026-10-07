@@ -202,6 +202,11 @@ func Run(cfg *config.Config) error {
 		evgaApprovalService = evgaapp.NewApprovalService(
 			evgaApprovalRepo, evgaRouteRepo,
 			evgaStatusRepo, evgaService, cfg.EVGA.WriteEnabled, log)
+		// ЭЦП согласующего при подписании (спека 015 FR-5): тот же верификатор, что и у входа
+		if cfg.EVGA.ApproveEDS {
+			evgaApprovalService.EnableApproveEDS(edsVerifier)
+			log.Info("evga: подпись согласующего включена", zap.String("eds_mode", cfg.EDS.Mode))
+		}
 		evgaOutgoingService = evgaapp.NewOutgoingService(
 			evgarepo.NewOutgoingRepo(evgaDB), evgaApprovalRepo, evgaRouteRepo,
 			evgaStatusRepo, evgaService, cfg.EVGA.WriteEnabled, log)

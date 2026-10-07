@@ -92,7 +92,7 @@ export function useEvga() {
   const noticePreview = (ids: number[]) =>
     api<EvgaNoticePreview>('/api/v1/evga/notices/preview', { method: 'POST', body: { ids } })
 
-  const noticeCreate = (groups: { record_ids: number[]; its_cli_id: number }[]) =>
+  const noticeCreate = (groups: { record_ids: number[]; its_cli_ids: number[] }[]) =>
     api<EvgaNoticeCreateResult>('/api/v1/evga/notices', { method: 'POST', body: { groups } })
 
   const noticeList = (p: { page?: number; page_size?: number; status_id?: number | null; docnum?: string; department_id?: number | null }) =>
@@ -123,8 +123,16 @@ export function useEvga() {
   const noticeSubmit = (noticeId: number) =>
     api<{ docnum: string; status_id: number }>(`/api/v1/evga/notices/${noticeId}/submit`, { method: 'POST' })
 
-  const noticeApprove = (noticeId: number, comment?: string) =>
-    api<{ approved: boolean }>(`/api/v1/evga/notices/${noticeId}/approve`, { method: 'POST', body: { comment } })
+  // challenge на подпись согласующего (backend-спека 015 FR-1)
+  const approveChallenge = (noticeId: number) =>
+    api<{ challenge: string }>(`/api/v1/evga/notices/${noticeId}/approve/challenge`, { method: 'POST' })
+
+  // согласование; при включённой ЭЦП передаются challenge + CMS (спека 015 FR-2)
+  const noticeApprove = (noticeId: number, comment?: string, challenge?: string, signedData?: string) =>
+    api<{ approved: boolean }>(`/api/v1/evga/notices/${noticeId}/approve`, {
+      method: 'POST',
+      body: { comment, challenge, signed_data: signedData },
+    })
 
   const noticeReject = (noticeId: number, comment: string) =>
     api<{ rejected: boolean }>(`/api/v1/evga/notices/${noticeId}/reject`, { method: 'POST', body: { comment } })
@@ -164,7 +172,7 @@ export function useEvga() {
   return {
     registry, card, references, exportRegistry, changeStatus, bulkStatus, history,
     noticePreview, noticeCreate, noticeList, noticeGet, noticeDelete, cliSearch,
-    routeGet, routePut, participants, noticeSubmit, noticeApprove, noticeReject,
+    routeGet, routePut, participants, noticeSubmit, approveChallenge, noticeApprove, noticeReject,
     noticeOutgoing, noticeOut, noticePDF, noticeSendESEDO,
   }
 }

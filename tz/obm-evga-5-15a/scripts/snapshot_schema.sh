@@ -47,13 +47,30 @@ echo "==> 4/5 Данные справочников -> refdata.sql (без бо�
   -t public.its_risk_status -t public.its_regions -t public.its_departments \
   -t public.its_risk_profile > "$OUT/refdata.sql" || echo "  (часть справочников не снялась — см. вывод)"
 
-echo "==> 5/5 Сэмплы рабочих таблиц (ПДн! не коммитить) -> sample_*.csv"
-# files намеренно исключён: возможны большие blob-поля; его структура есть в schema.sql
-for t in its_tb_5_15a its_risk_notice its_risk_notice_5_15a its_risk_notice_recepient its_cli its_out its_req its_activity users; do
-  "${PSQL[@]}" -c "\\copy (select * from public.\"$t\" limit 300) to stdout with csv header" \
-    > "$OUT/sample_$t.csv" 2>/dev/null \
-    && echo "  $t: ok" || { echo "  $t: нет таблицы или нет прав"; rm -f "$OUT/sample_$t.csv"; }
-done
+echo "==> 5/5 СВЯЗНЫЙ срез уведомлений (FK-консистентно; ПДн! не коммитить) -> sample_*.csv"
+# Якорь A — последние 300 действующих уведомлений. Один и тот же предикат во всех выборках,
+# поэтому внешние ключи между таблицами совпадают (иначе список уведомлений пуст: req_id не
+# находит its_req). Плюс 150 записей витрины в статусе 1 для теста формирования и общий срез
+# its_cli/users для подсказок адресата/участников. files исключён (blob-поля).
+A='(select * from its_risk_notice where "in$trash" is null order by id desc limit 300)'
+
+sample() { # $1 имя таблицы(файла), $2 SELECT
+  if "${PSQL[@]}" -c "\\copy ($2) to stdout with csv header" > "$OUT/sample_$1.csv" 2>/dev/null; then
+    echo "  $1: $(( $(wc -l < "$OUT/sample_$1.csv") - 1 )) строк"
+  else
+    echo "  $1: ошибка/нет доступа"; rm -f "$OUT/sample_$1.csv"
+  fi
+}
+
+sample its_risk_notice            "select * from $A n"
+sample its_req                    "select * from its_req where id in (select req_id from $A a where req_id is not null)"
+sample its_out                    "select * from its_out where id in (select its_out_id from $A a where its_out_id is not null)"
+sample its_risk_notice_recepient  "select * from its_risk_notice_recepient where its_risk_notice_id in (select id from $A a)"
+sample its_risk_notice_5_15a      "select * from its_risk_notice_5_15a where its_risk_notice_id in (select id from $A a)"
+sample its_tb_5_15a               "select * from its_tb_5_15a where id in (select tb_5_15a_id from its_risk_notice_5_15a where its_risk_notice_id in (select id from $A a)) union select * from (select * from its_tb_5_15a where \"in\$trash\" is null and its_risk_status_id = 1 limit 150) s1"
+sample its_cli                    "select * from its_cli where id in (select its_cli_id from its_risk_notice_recepient where its_risk_notice_id in (select id from $A a) union select sender_cli_id from its_out where id in (select its_out_id from $A a where its_out_id is not null)) union select * from (select * from its_cli where \"in\$trash\" is null limit 300) c1"
+sample its_activity               "select * from its_activity where \"in\$trash\" is null limit 300"
+sample users                      "select * from users where id in (select signer_id from $A a where signer_id is not null union select created_by from $A a where created_by is not null union select created_by from its_out where id in (select its_out_id from $A a where its_out_id is not null)) union select * from (select * from users where \"in\$trash\" is null limit 300) u1"
 
 echo "Готово: $OUT"
 echo "Дальше: ./load_dev_replica.sh — залить схему и справочники в dev-Postgres."

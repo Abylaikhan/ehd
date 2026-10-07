@@ -25,8 +25,11 @@ type RouteStepModel struct {
 	OpenedAt      *time.Time
 	ClosedAt      *time.Time
 	ClosedByObmID *int64
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	// Подпись согласующего (спека 015 FR-3): CMS хранится для аудита, наружу не отдаётся.
+	SignCMS   string `gorm:"type:text"`
+	SignedAt  *time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 func (RouteStepModel) TableName() string { return "evga_notice_route_steps" }
@@ -44,8 +47,15 @@ func toDomainStep(m RouteStepModel) domain.RouteStep {
 		ID: m.ID, NoticeID: m.NoticeID, Round: m.Round, StepNN: m.StepNN, Kind: m.Kind,
 		AssigneeObmID: m.AssigneeObmID, AssigneeName: m.AssigneeName,
 		Status: m.Status, Result: m.Result, Comment: m.Comment,
-		OpenedAt: m.OpenedAt, ClosedAt: m.ClosedAt,
+		OpenedAt: m.OpenedAt, ClosedAt: m.ClosedAt, SignedAt: m.SignedAt,
 	}
+}
+
+// SetStepSignature — сохранить CMS подписи согласующего на шаге (спека 015 FR-3).
+func (rr *RouteRepo) SetStepSignature(ctx context.Context, stepID int64, cms string, at time.Time) error {
+	return rr.db.WithContext(ctx).Model(&RouteStepModel{}).
+		Where("id = ?", stepID).
+		Updates(map[string]any{"sign_cms": cms, "signed_at": at}).Error
 }
 
 // Steps — все шаги уведомления: шаблон (round=0) и раунды исполнения, новые раунды выше.

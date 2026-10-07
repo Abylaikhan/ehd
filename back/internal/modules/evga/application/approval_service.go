@@ -2,15 +2,68 @@ package application
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"strings"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
 
 	"ehd-api/internal/modules/auth/contract"
+	"ehd-api/internal/modules/auth/eds"
 	"ehd-api/internal/modules/evga/domain"
 	"ehd-api/internal/modules/evga/repository"
 )
+
+// signChallengeTTL — срок жизни challenge на подписание (спека 015 FR-1).
+const signChallengeTTL = 5 * time.Minute
+
+// signChallenges — одноразовые challenge подписания, привязанные к пользователю и уведомлению.
+type signChallenges struct {
+	mu   sync.Mutex
+	vals map[string]signChallenge
+}
+
+type signChallenge struct {
+	userID   string
+	noticeID int64
+	expires  time.Time
+}
+
+func newSignChallenges() *signChallenges {
+	return &signChallenges{vals: map[string]signChallenge{}}
+}
+
+func (c *signChallenges) issue(userID string, noticeID int64, now time.Time) (string, error) {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	ch := hex.EncodeToString(buf)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	// попутно чистим протухшие
+	for k, v := range c.vals {
+		if now.After(v.expires) {
+			delete(c.vals, k)
+		}
+	}
+	c.vals[ch] = signChallenge{userID: userID, noticeID: noticeID, expires: now.Add(signChallengeTTL)}
+	return ch, nil
+}
+
+// consume — одноразовое использование: challenge должен принадлежать этому пользователю и уведомлению.
+func (c *signChallenges) consume(ch, userID string, noticeID int64, now time.Time) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	v, ok := c.vals[ch]
+	if !ok {
+		return false
+	}
+	delete(c.vals, ch)
+	return v.userID == userID && v.noticeID == noticeID && now.Before(v.expires)
+}
 
 // ApprovalRepoPort — порт obm_evga-части согласования.
 type ApprovalRepoPort interface {
@@ -32,6 +85,8 @@ type RouteRepoPort interface {
 	OpenStep(ctx context.Context, noticeID int64) (*domain.RouteStep, error)
 	CloseStep(ctx context.Context, stepID int64, result, comment string, closedBy int64, openNext bool) (*domain.RouteStep, error)
 	CancelOpenSteps(ctx context.Context, noticeID int64) error
+	// SetStepSignature — CMS подписи согласующего на шаге (спека 015 FR-3).
+	SetStepSignature(ctx context.Context, stepID int64, cms string, at time.Time) error
 }
 
 // ApprovalService — маршрут и согласование уведомлений (спека 010).
@@ -43,11 +98,28 @@ type ApprovalService struct {
 	writeEnabled bool
 	log          *zap.Logger
 	now          func() time.Time
+	// подписание согласующим (спека 015): verifier из auth/eds, рубильник EVGA_APPROVE_EDS
+	eds         eds.Verifier
+	edsRequired bool
+	challenges  *signChallenges
 }
 
 func NewApprovalService(obm ApprovalRepoPort, route RouteRepoPort, users UserResolver, scopes ScopeProvider, writeEnabled bool, log *zap.Logger) *ApprovalService {
-	return &ApprovalService{obm: obm, route: route, users: users, scopes: scopes, writeEnabled: writeEnabled, log: log, now: time.Now}
+	return &ApprovalService{
+		obm: obm, route: route, users: users, scopes: scopes,
+		writeEnabled: writeEnabled, log: log, now: time.Now,
+		challenges: newSignChallenges(),
+	}
 }
+
+// EnableApproveEDS — включить обязательную ЭЦП согласующего (спека 015 FR-5).
+func (s *ApprovalService) EnableApproveEDS(v eds.Verifier) {
+	s.eds = v
+	s.edsRequired = v != nil
+}
+
+// ApproveEDSRequired — требуется ли подпись при согласовании (для фронта).
+func (s *ApprovalService) ApproveEDSRequired() bool { return s.edsRequired }
 
 // editableStates — статусы заявки, в которых маршрут редактируем и возможна отправка (FR-2/4, §11.4).
 func editableState(statID *int64) bool {
@@ -201,7 +273,54 @@ func templateToInput(tpl []domain.RouteStep) domain.RouteInput {
 }
 
 // Approve — согласование=подписание текущим согласующим (FR-5, В1).
-func (s *ApprovalService) Approve(ctx context.Context, id contract.Identity, noticeID int64, comment string) error {
+// ApproveChallenge — одноразовый challenge на подписание шага (спека 015 FR-1).
+// Выдаётся только исполнителю открытого шага согласования.
+func (s *ApprovalService) ApproveChallenge(ctx context.Context, id contract.Identity, noticeID int64) (string, error) {
+	meta, actor, err := s.actorMeta(ctx, id, noticeID, true)
+	if err != nil {
+		return "", err
+	}
+	if meta.StatID == nil || *meta.StatID != domain.ReqStatApproving {
+		return "", domain.ErrRouteStateInvalid
+	}
+	step, err := s.route.OpenStep(ctx, noticeID)
+	if err != nil {
+		return "", err
+	}
+	if step == nil || step.Kind != domain.RouteKindApprove {
+		return "", domain.ErrRouteStateInvalid
+	}
+	if actor == nil || *actor != step.AssigneeObmID {
+		return "", domain.ErrNotAssignee
+	}
+	return s.challenges.issue(id.UserID, noticeID, s.now())
+}
+
+// verifySignature — проверка ЭЦП согласующего (спека 015 FR-2): challenge одноразов,
+// CMS проходит криптопроверку, ИИН сертификата совпадает с ИИН пользователя.
+func (s *ApprovalService) verifySignature(ctx context.Context, id contract.Identity, noticeID int64, challenge, signedData string) error {
+	if strings.TrimSpace(challenge) == "" || strings.TrimSpace(signedData) == "" {
+		return domain.ErrSignatureRequired
+	}
+	if !s.challenges.consume(challenge, id.UserID, noticeID, s.now()) {
+		return domain.ErrChallengeInvalid
+	}
+	sd, err := s.eds.Verify(challenge, signedData)
+	if err != nil || !sd.Valid {
+		return domain.ErrSignatureInvalid
+	}
+	iin, verified, err := s.scopes.UserIINOf(ctx, id)
+	if err != nil || !verified || iin == "" {
+		return domain.ErrSignerMismatch
+	}
+	if sd.IIN != iin {
+		// подписывать можно только своим сертификатом (ИИН не логируем — ПДн)
+		return domain.ErrSignerMismatch
+	}
+	return nil
+}
+
+func (s *ApprovalService) Approve(ctx context.Context, id contract.Identity, noticeID int64, comment, challenge, signedData string) error {
 	meta, actor, err := s.actorMeta(ctx, id, noticeID, true)
 	if err != nil {
 		return err
@@ -218,6 +337,15 @@ func (s *ApprovalService) Approve(ctx context.Context, id contract.Identity, not
 	}
 	if actor == nil || *actor != step.AssigneeObmID {
 		return domain.ErrNotAssignee
+	}
+	// ЭЦП согласующего (спека 015 FR-2/FR-5): при включённом рубильнике обязательна
+	if s.edsRequired {
+		if err := s.verifySignature(ctx, id, noticeID, challenge, signedData); err != nil {
+			return err
+		}
+		if err := s.route.SetStepSignature(ctx, step.ID, signedData, s.now()); err != nil {
+			return err
+		}
 	}
 
 	next, err := s.route.CloseStep(ctx, step.ID, domain.RouteResultApproved, comment, *actor, true)

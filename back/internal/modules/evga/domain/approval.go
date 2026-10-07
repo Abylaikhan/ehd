@@ -32,6 +32,16 @@ var (
 	ErrCommentRequired = errors.New("для возврата на доработку обязателен комментарий")
 	// ErrNumberingUnavailable — у департамента не настроен код региона (FR-8).
 	ErrNumberingUnavailable = errors.New("нумерация недоступна: у департамента не задан код региона")
+
+	// Подписание согласующим (спека 015).
+	// ErrSignatureRequired — режим EVGA_APPROVE_EDS включён, но подпись не передана (FR-2).
+	ErrSignatureRequired = errors.New("для подписания требуется ЭЦП")
+	// ErrChallengeInvalid — challenge не выдавался, истёк или уже использован (FR-1).
+	ErrChallengeInvalid = errors.New("запрос на подпись недействителен или истёк")
+	// ErrSignatureInvalid — CMS не прошла криптопроверку (FR-2).
+	ErrSignatureInvalid = errors.New("подпись не прошла проверку")
+	// ErrSignerMismatch — ИИН сертификата не совпадает с ИИН пользователя (FR-2).
+	ErrSignerMismatch = errors.New("сертификат принадлежит другому лицу")
 )
 
 // RouteStep — этап маршрута (хранится в БД ЕХД).
@@ -48,6 +58,8 @@ type RouteStep struct {
 	Comment       string
 	OpenedAt      *time.Time
 	ClosedAt      *time.Time
+	// Подпись согласующего (спека 015 FR-3/FR-4): сам CMS наружу не отдаётся.
+	SignedAt *time.Time
 }
 
 // RouteInput — редактирование шаблона маршрута (FR-2).
