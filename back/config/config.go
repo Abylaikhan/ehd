@@ -99,7 +99,7 @@ type Reporter struct {
 	SystemDBDenylist []string
 }
 
-// EVGA — модуль ОБМ ЕВГА: внешняя PostgreSQL obm_evga (спека 007 FR-1/2, спека 008 FR-1).
+// EVGA — модуль ОБМ ЭВГА: внешняя PostgreSQL obm_evga (спека 007 FR-1/2, спека 008 FR-1).
 // DSN необязателен: без него модуль выключен и маршруты не регистрируются.
 // WriteEnabled=false (по умолчанию) — строго read-only DSN, пишущие эндпоинты закрыты;
 // включается только после согласования миграций с заказчиком (dev-реплика — можно).
@@ -128,7 +128,7 @@ type EVGAESEDO struct {
 	CertPath  string
 }
 
-// Enabled — модуль ЕВГА включён, если задан DSN внешней БД.
+// Enabled — модуль ЭВГА включён, если задан DSN внешней БД.
 func (e EVGA) Enabled() bool { return e.DSN != "" }
 
 // New читает конфигурацию из переменных окружения через viper.

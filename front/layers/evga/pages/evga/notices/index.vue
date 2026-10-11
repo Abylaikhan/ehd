@@ -39,7 +39,7 @@ const fmtTS = (v: string | null) => (v ? new Date(v).toLocaleString('ru-RU') : '
 
 <template>
   <div>
-    <PageHeader title="ОБМ ЕВГА — Уведомления" description="Уведомления об устранении нарушений по витрине рисков 5-15а.">
+    <PageHeader title="ОБМ ЭВГА — Уведомления" description="Уведомления об устранении нарушений по витрине рисков 5-15а.">
       <template #actions>
         <Tag v-if="scope?.all_departments" value="Все департаменты" severity="info" />
         <NuxtLink to="/evga"><Button label="Реестр рисков" icon="pi pi-table" text /></NuxtLink>
@@ -58,7 +58,7 @@ const fmtTS = (v: string | null) => (v ? new Date(v).toLocaleString('ru-RU') : '
             <span class="count">Всего: <b>{{ total.toLocaleString('ru-RU') }}</b></span>
           </div>
 
-          <DataTable :value="rows" :loading="pending" lazy striped-rows size="small" scrollable class="data-table">
+          <DataTable show-gridlines :value="rows" :loading="pending" lazy striped-rows size="small" scrollable class="data-table">
             <template #empty>
               <div class="empty-row">Уведомлений не найдено.</div>
             </template>

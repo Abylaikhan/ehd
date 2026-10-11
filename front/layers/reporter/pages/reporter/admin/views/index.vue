@@ -44,7 +44,7 @@ const fmtDate = (iso: string) => (iso ? iso.slice(0, 10) : '')
     <Message v-if="error" severity="error" :closable="false" class="mb">Не удалось загрузить список витрин</Message>
     <Message v-if="actionError" severity="error" :closable="true" class="mb">{{ actionError }}</Message>
 
-    <DataTable :value="items" :loading="pending" data-key="id" size="small">
+    <DataTable show-gridlines :value="items" :loading="pending" data-key="id" size="small">
       <template #empty><EmptyState icon="pi pi-table" title="Витрин пока нет" hint="Нажмите «Создать витрину»." /></template>
       <Column header="Название">
         <template #body="{ data: v }">

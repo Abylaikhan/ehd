@@ -123,7 +123,7 @@ func (rp *RegistryRepo) base(ctx context.Context, f domain.Filter, deptID *int64
 		Joins("left join its_departments d on d.id = t.its_departments_id").
 		Where(`t."in$trash" is null`)
 
-	if needNotice || f.InNotice != nil || f.NoticeNum != "" {
+	if needNotice || f.InNotice != nil || f.NoticeNum != "" || f.OutNum != "" {
 		q = q.Joins(noticeLateral)
 	}
 	if deptID != nil {
@@ -154,13 +154,14 @@ func (rp *RegistryRepo) base(ctx context.Context, f domain.Filter, deptID *int64
 		q = q.Where("t.paymentdate <= ?", *f.PaymentTo)
 	}
 	if f.GU != "" {
-		q = q.Where("t.gu = ?", f.GU)
+		// подстрока, а не точное совпадение — колоночный поиск (спека 019)
+		q = q.Where("t.gu ilike ?", "%"+f.GU+"%")
 	}
 	if f.SenderName != "" {
 		q = q.Where("t.sendername ilike ?", "%"+f.SenderName+"%")
 	}
 	if f.IIN != "" {
-		q = q.Where("t.iin = ?", f.IIN)
+		q = q.Where("t.iin ilike ?", "%"+f.IIN+"%")
 	}
 	if f.AmountFrom != nil {
 		q = q.Where("t.amount_part >= ?", *f.AmountFrom)
@@ -174,6 +175,24 @@ func (rp *RegistryRepo) base(ctx context.Context, f domain.Filter, deptID *int64
 		} else {
 			q = q.Where("ln.notice_id is null")
 		}
+	}
+	// колоночный поиск (спека 019): подстрока, регистронезависимо
+	if f.PpoPp != "" {
+		q = q.Where("t.ppo_pp ilike ?", "%"+f.PpoPp+"%")
+	}
+	if f.FIO != "" {
+		q = q.Where(
+			"concat_ws(' ', coalesce(t.fm,''), coalesce(t.nm,''), coalesce(t.ft,'')) ilike ?",
+			"%"+f.FIO+"%")
+	}
+	if f.LA1 != "" {
+		q = q.Where("t.la1 ilike ?", "%"+f.LA1+"%")
+	}
+	if f.StatusNote != "" {
+		q = q.Where("t.risk_status_note ilike ?", "%"+f.StatusNote+"%")
+	}
+	if f.OutNum != "" {
+		q = q.Where("ln.out_num ilike ?", "%"+f.OutNum+"%")
 	}
 	if f.NoticeNum != "" {
 		q = q.Where("ln.notice_num ilike ?", "%"+f.NoticeNum+"%")

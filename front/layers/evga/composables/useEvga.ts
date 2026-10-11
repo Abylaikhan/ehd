@@ -32,6 +32,12 @@ export interface EvgaRegistryParams {
   notice_num?: string
   confirmed_no_decision?: boolean | null
   department_id?: number | null
+  // колоночный поиск (backend-спека 019)
+  ppo_pp?: string
+  fio?: string
+  la1?: string
+  status_note?: string
+  out_num?: string
   page?: number
   page_size?: number
   sort?: string
@@ -47,7 +53,7 @@ function toQuery(p: EvgaRegistryParams): Record<string, string> {
   return q
 }
 
-// Клиент API модуля ОБМ ЕВГА.
+// Клиент API модуля ОБМ ЭВГА.
 export function useEvga() {
   const api = useApi()
 

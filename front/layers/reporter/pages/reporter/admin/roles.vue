@@ -51,7 +51,7 @@ const save = async () => {
 
     <Message v-if="error" severity="error" :closable="false" class="mb">Не удалось загрузить роли</Message>
 
-    <DataTable :value="items" :loading="pending" data-key="id">
+    <DataTable show-gridlines :value="items" :loading="pending" data-key="id">
       <template #empty><div class="empty">Роли не найдены</div></template>
       <Column field="code" header="Код" />
       <Column field="name_ru" header="Название (RU)" />

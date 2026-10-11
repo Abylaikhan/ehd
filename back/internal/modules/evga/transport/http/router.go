@@ -2,7 +2,7 @@ package http
 
 import "github.com/gofiber/fiber/v2"
 
-// Register монтирует маршруты модуля ОБМ ЕВГА (все — под RequireModule).
+// Register монтирует маршруты модуля ОБМ ЭВГА (все — под RequireModule).
 // Порядок важен: /registry/export раньше /registry/:id.
 func Register(r fiber.Router, h *Handler, guard *Guard) {
 	r.Get("/ping", func(c *fiber.Ctx) error {

@@ -157,7 +157,7 @@ async function toggleActive(s: DataSourceSummary) {
       <Button label="Добавить источник" icon="pi pi-plus" @click="openCreate" />
     </div>
 
-    <DataTable v-else :value="items" :loading="pending" data-key="id" size="small">
+    <DataTable show-gridlines v-else :value="items" :loading="pending" data-key="id" size="small">
       <Column header="Источник">
         <template #body="{ data: s }">
           <div class="src-name"><i class="pi pi-database" /> {{ s.name }}</div>

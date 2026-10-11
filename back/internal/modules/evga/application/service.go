@@ -1,4 +1,4 @@
-// Package application — use cases модуля ОБМ ЕВГА (спека 007): доверенная видимость
+// Package application — use cases модуля ОБМ ЭВГА (спека 007): доверенная видимость
 // по департаменту (резолв ИИН → obm_evga.users), реестр, карточка, справочники, экспорт.
 package application
 
@@ -45,7 +45,7 @@ type scopeEntry struct {
 	exp   time.Time
 }
 
-// Service — приложение модуля ЕВГА.
+// Service — приложение модуля ЭВГА.
 type Service struct {
 	repo     Repo
 	iin      IINProvider

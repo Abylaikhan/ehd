@@ -36,7 +36,7 @@ import (
 
 // evgaReadOnlyDSN добавляет к DSN obm_evga сессионный параметр
 // default_transaction_read_only=on (pgx передаёт его как runtime-параметр стартапа) —
-// модуль ЕВГА работает с внешней БД строго в режиме чтения (спека 007 FR-2).
+// модуль ЭВГА работает с внешней БД строго в режиме чтения (спека 007 FR-2).
 func evgaReadOnlyDSN(dsn string) (string, error) {
 	u, err := url.Parse(dsn)
 	if err != nil || u.Scheme == "" {
@@ -149,7 +149,7 @@ func Run(cfg *config.Config) error {
 	}
 	defer ch.Close()
 
-	// --- Модуль ОБМ ЕВГА (внешняя PostgreSQL obm_evga; спека 007, режим записи — спека 008 FR-1/2) ---
+	// --- Модуль ОБМ ЭВГА (внешняя PostgreSQL obm_evga; спека 007, режим записи — спека 008 FR-1/2) ---
 	var evgaService *evgaapp.Service
 	var evgaStatusService *evgaapp.StatusService
 	var evgaNoticeService *evgaapp.NoticeService

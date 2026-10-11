@@ -136,7 +136,7 @@ const workRows = computed<Row[]>(() => {
 
     <ErrorState v-if="screenState === 'denied'" title="Доступ запрещён" message="У вас нет прав на просмотр этой записи." />
     <ErrorState v-else-if="screenState === 'notfound'" title="Запись не найдена" message="Запись не существует или относится к другому департаменту." />
-    <ErrorState v-else-if="screenState === 'source'" title="Источник недоступен" message="База данных ОБМ ЕВГА временно недоступна." retryable @retry="refresh" />
+    <ErrorState v-else-if="screenState === 'source'" title="Источник недоступен" message="База данных ОБМ ЭВГА временно недоступна." retryable @retry="refresh" />
     <ErrorState v-else-if="screenState === 'error'" message="Не удалось загрузить карточку." retryable @retry="refresh" />
     <div v-else-if="screenState === 'loading'" class="center"><ProgressSpinner style="width: 2.5rem; height: 2.5rem" /></div>
 
@@ -179,7 +179,7 @@ const workRows = computed<Row[]>(() => {
         <template #title>История статусов</template>
         <template #content>
           <p v-if="history.length === 0" class="hist-empty">Изменений статуса пока не зафиксировано.</p>
-          <DataTable v-else :value="history" size="small" striped-rows class="hist-table">
+          <DataTable show-gridlines v-else :value="history" size="small" striped-rows class="hist-table">
             <Column header="Дата">
               <template #body="{ data: h }">{{ fmtTS(h.changed_at) }}</template>
             </Column>

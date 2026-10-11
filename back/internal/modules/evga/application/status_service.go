@@ -12,7 +12,7 @@ import (
 )
 
 // ErrReadOnlyMode — запись выключена конфигом (спека 008 FR-1, 403 EVGA_READ_ONLY).
-var ErrReadOnlyMode = errors.New("модуль ОБМ ЕВГА работает в режиме чтения")
+var ErrReadOnlyMode = errors.New("модуль ОБМ ЭВГА работает в режиме чтения")
 
 // ErrCuratorReadOnly — куратор не меняет статусы (403 ACCESS_DENIED).
 var ErrCuratorReadOnly = errors.New("роль куратора не допускает изменения записей")

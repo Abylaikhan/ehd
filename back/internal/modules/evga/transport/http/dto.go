@@ -110,6 +110,12 @@ func parseFilter(c *fiber.Ctx) (domain.Filter, error) {
 	f.SenderName = c.Query("sendername")
 	f.IIN = c.Query("iin")
 	f.NoticeNum = c.Query("notice_num")
+	// колоночный поиск по остальным столбцам грида (спека 019)
+	f.PpoPp = c.Query("ppo_pp")
+	f.FIO = c.Query("fio")
+	f.LA1 = c.Query("la1")
+	f.StatusNote = c.Query("status_note")
+	f.OutNum = c.Query("out_num")
 	return f, nil
 }
 
