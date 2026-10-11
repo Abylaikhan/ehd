@@ -95,11 +95,24 @@ type NoticeListItem struct {
 	Department  string
 }
 
-// NoticeCard — карточка уведомления (FR-8).
+// NoticeRecipient — адресат уведомления с порядковым номером (спека 018 FR-1).
+type NoticeRecipient struct {
+	NN    int
+	CliID int64
+	Title string
+}
+
+// NoticeCard — карточка уведомления (FR-8) + реквизиты формы (спека 018 FR-1).
 type NoticeCard struct {
 	NoticeListItem
 	NoticeTxt string
 	Rows      []NoticeRow
+	// реквизиты действующей формы
+	Initiator  string // ФИО создателя (its_risk_notice.created_by)
+	OutDocNum  string // номер привязанного исходящего письма
+	OutDocDate *time.Time
+	Recipients []NoticeRecipient
+	Comment    string // хранится в БД ЕХД (obm_evga в бою read-only)
 }
 
 // NoticeRow — строка снимка (EVGA-FR-038).

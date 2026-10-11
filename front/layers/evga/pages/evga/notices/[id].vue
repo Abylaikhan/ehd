@@ -45,6 +45,24 @@ const screenState = computed(() => {
   return 'ready'
 })
 
+// комментарий к уведомлению (backend-спека 018 FR-2)
+const commentDraft = ref('')
+const commentBusy = ref(false)
+watch(card, (c) => { commentDraft.value = c?.comment ?? '' }, { immediate: true })
+
+async function saveComment() {
+  commentBusy.value = true
+  actionError.value = ''
+  try {
+    await evga.noticeSetComment(id.value, commentDraft.value)
+    refresh()
+  } catch (e) {
+    actionError.value = apiErrorMessage(e)
+  } finally {
+    commentBusy.value = false
+  }
+}
+
 const pdfBusy = ref(false)
 async function downloadPDF() {
   pdfBusy.value = true
@@ -162,8 +180,20 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
               <template #title>Регистрационные реквизиты</template>
               <template #content>
                 <dl class="props">
+                  <dt>Номер документа</dt><dd>{{ header?.docnum || '—' }}</dd>
                   <dt>Статус</dt><dd>{{ header?.status_title || '—' }}</dd>
-                  <dt>Адресат (ЕСЭДО)</dt><dd>{{ header?.recipient || '—' }}</dd>
+                  <dt>Дата создания</dt><dd>{{ header?.created_at ? fmtDate(header.created_at) : '—' }}</dd>
+                  <dt>Инициатор</dt><dd>{{ card.initiator || '—' }}</dd>
+                  <!-- адресаты с порядком (backend-спека 018) -->
+                  <dt>Адресаты (ЕСЭДО)</dt>
+                  <dd>
+                    <template v-if="card.recipients?.length">
+                      <div v-for="r in card.recipients" :key="r.cli_id" class="recipient">
+                        <span class="recipient-nn">{{ r.nn }}.</span> {{ r.title }}
+                      </div>
+                    </template>
+                    <template v-else>{{ header?.recipient || '—' }}</template>
+                  </dd>
                   <dt>Записей в приложении</dt><dd>{{ header?.rows_count }}</dd>
                   <dt>Общая сумма</dt><dd>{{ fmtAmount(header?.total_sum || '0') }}</dd>
                   <template v-if="outData?.exists">
@@ -171,7 +201,20 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
                     <dt v-if="outData.doc_date">Дата регистрации</dt><dd v-if="outData.doc_date">{{ fmtDate(outData.doc_date) }}</dd>
                     <dt v-if="outData.exec_due">Срок исполнения</dt><dd v-if="outData.exec_due">{{ fmtDate(outData.exec_due) }}</dd>
                   </template>
+                  <template v-else>
+                    <dt>Исходящее письмо</dt><dd>—</dd>
+                  </template>
                 </dl>
+
+                <!-- комментарий к уведомлению (backend-спека 018 FR-2) -->
+                <div class="comment-block">
+                  <label class="comment-label">Комментарий</label>
+                  <Textarea v-model="commentDraft" rows="2" auto-resize fluid :disabled="!canWrite" placeholder="Произвольный комментарий к уведомлению" />
+                  <div v-if="canWrite" class="comment-actions">
+                    <Button label="Сохранить комментарий" icon="pi pi-save" size="small" text
+                      :loading="commentBusy" :disabled="commentDraft === (card.comment || '')" @click="saveComment" />
+                  </div>
+                </div>
               </template>
             </Card>
 
@@ -272,6 +315,11 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
 .props dt { color: var(--ehd-ink-2); font-size: 0.88rem; }
 .props dd { margin: 0; color: var(--ehd-ink); font-size: 0.92rem; }
 .notice-text { margin: 0; line-height: 1.6; color: var(--ehd-ink); }
+.recipient { line-height: 1.5; }
+.recipient-nn { color: var(--ehd-ink-2); margin-right: 0.25rem; }
+.comment-block { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.comment-label { font-size: 0.88rem; color: var(--ehd-ink-2); }
+.comment-actions { display: flex; justify-content: flex-end; }
 .muted { margin: 0 0 0.75rem; color: var(--ehd-ink-2); }
 .attach :deep(.p-button-label) { text-decoration: underline; }
 .data-table { border: 1px solid var(--ehd-border); border-radius: var(--ehd-radius-sm); overflow: hidden; }
