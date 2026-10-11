@@ -36,6 +36,8 @@ export interface UserView {
   full_name: string
   iin_masked: string
   iin_verified: boolean
+  /** необязательный контакт (backend-спека 020) */
+  phone: string
   status: UserStatus
   failed_attempts: number
   roles: string[]
@@ -79,6 +81,8 @@ export interface RegisterRequest {
 export interface UpdateUserRequest {
   iin_verified?: boolean
   status?: UserStatus
+  /** необязательный контакт; "" очищает (backend-спека 020) */
+  phone?: string
   role_ids?: string[]
   region_ids?: string[]
   department_ids?: string[]

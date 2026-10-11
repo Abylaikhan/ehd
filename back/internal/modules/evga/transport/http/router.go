@@ -19,6 +19,7 @@ func Register(r fiber.Router, h *Handler, guard *Guard) {
 	user.Get("/references", h.references)
 
 	// администрирование: привязка пользователя к департаменту ДВГА (спека 016)
+	user.Post("/admin/user-departments", h.adminUsersDepartments) // спека 020
 	user.Get("/admin/users/:uid/department", h.adminGetUserDept)
 	user.Put("/admin/users/:uid/department", h.adminSetUserDept)
 

@@ -46,6 +46,29 @@ const { data: evgaRefs } = await useAsyncData('ref-evga-departments', async () =
 })
 const evgaDepartments = computed(() => evgaRefs.value?.departments ?? [])
 
+// Колонка «Департамент ДВГА» (backend-спека 020): эффективный департамент пачкой на страницу —
+// сначала назначение админом, иначе резолв по ИИН из obm_evga.
+type UserDept = { department_id: number; department_title: string; source: string }
+const userDepts = ref<Record<string, UserDept>>({})
+watch(
+  () => data.value?.items,
+  async (list) => {
+    userDepts.value = {}
+    const ids = (list ?? []).map((u) => u.id)
+    if (!ids.length || !evgaDepartments.value.length) return
+    try {
+      const r = await api<{ items: Record<string, UserDept> }>('/api/v1/evga/admin/user-departments', {
+        method: 'POST',
+        body: { user_ids: ids },
+      })
+      userDepts.value = r.items ?? {}
+    } catch {
+      userDepts.value = {} // модуль выключен или нет прав — колонка просто пустая
+    }
+  },
+  { immediate: true },
+)
+
 const items = computed(() => data.value?.items ?? [])
 const total = computed(() => data.value?.total_count ?? 0)
 const first = computed(() => (page.value - 1) * pageSize.value)
@@ -72,6 +95,7 @@ const saving = ref(false)
 const editForm = reactive<UpdateUserRequest>({
   iin_verified: false,
   status: 'active',
+  phone: '',
   role_ids: [],
   region_ids: [],
   department_ids: [],
@@ -85,6 +109,7 @@ const openEdit = async (u: UserView) => {
   editing.value = u
   editForm.iin_verified = u.iin_verified
   editForm.status = u.status
+  editForm.phone = u.phone ?? ''
   editForm.role_ids = (roles.value?.items ?? []).filter((r) => u.roles.includes(r.code)).map((r) => r.id)
   editForm.region_ids = (regions.value?.items ?? []).filter((r) => u.region_codes.includes(r.code)).map((r) => r.id)
   editForm.department_ids = (departments.value?.items ?? []).filter((d) => u.department_codes.includes(d.code)).map((d) => d.id)
@@ -194,6 +219,18 @@ show-gridlines
           <Chip v-for="r in u.roles" :key="r" :label="r" class="role-chip" />
         </template>
       </Column>
+      <Column header="Департамент ДВГА" :style="{ minWidth: '13rem' }">
+        <template #body="{ data: u }">
+          <span v-if="userDepts[u.id]">
+            {{ userDepts[u.id]!.department_title }}
+            <Tag v-if="userDepts[u.id]!.source === 'iin'" value="по ИИН" severity="secondary" class="src-tag" />
+          </span>
+          <span v-else class="muted">—</span>
+        </template>
+      </Column>
+      <Column header="Телефон">
+        <template #body="{ data: u }">{{ u.phone || '—' }}</template>
+      </Column>
       <Column header="Создан">
         <template #body="{ data: u }">{{ fmtDate(u.created_at) }}</template>
       </Column>
@@ -217,6 +254,10 @@ show-gridlines
         <div class="edit-row"><span class="edit-k">ИИН</span><span>{{ editing.iin_masked }}</span></div>
         <div class="edit-row"><span class="edit-k">Email</span><span>{{ editing.email }}</span></div>
 
+        <div class="field">
+          <label>Телефон <span class="optional">(необязательно)</span></label>
+          <InputText v-model="editForm.phone" placeholder="+7 (___) ___-__-__" />
+        </div>
         <div class="field">
           <label>Статус</label>
           <Select v-model="editForm.status" :options="statusOptions.filter(o => o.value)" option-label="label" option-value="value" />
@@ -333,6 +374,14 @@ show-gridlines
 .hint {
   font-size: 0.78rem;
   color: var(--ehd-muted);
+}
+.optional {
+  color: var(--ehd-muted);
+  font-weight: 400;
+}
+.src-tag {
+  font-size: 0.7rem;
+  margin-left: 0.3rem;
 }
 .field :deep(.p-select),
 .field :deep(.p-multiselect) {

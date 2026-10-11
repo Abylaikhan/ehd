@@ -23,6 +23,29 @@ func userIDParam(c *fiber.Ctx) (string, error) {
 	return uid, nil
 }
 
+// adminUsersDepartments — POST /admin/user-departments (спека 020 FR-2):
+// эффективные департаменты пачкой для колонки в списке пользователей.
+func (h *Handler) adminUsersDepartments(c *fiber.Ctx) error {
+	var req struct {
+		UserIDs []string `json:"user_ids"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return httpserver.NewError(fiber.StatusBadRequest, "INVALID_FILTER", "Некорректное тело запроса",
+			httpserver.ErrorDetail{Field: "body", Reason: "invalid_json"})
+	}
+	m, err := h.svc.UsersDepartments(c.UserContext(), identityFrom(c), req.UserIDs)
+	if err != nil {
+		return mapErr(err)
+	}
+	items := make(map[string]fiber.Map, len(m))
+	for uid, d := range m {
+		items[uid] = fiber.Map{
+			"department_id": d.DepartmentID, "department_title": d.DepartmentTitle, "source": d.Source,
+		}
+	}
+	return c.JSON(fiber.Map{"items": items})
+}
+
 // adminGetUserDept — GET /admin/users/:uid/department (спека 016 FR-3).
 func (h *Handler) adminGetUserDept(c *fiber.Ctx) error {
 	uid, err := userIDParam(c)

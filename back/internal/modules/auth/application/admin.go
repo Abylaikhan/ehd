@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -19,6 +20,7 @@ type AdminUserView struct {
 	IINVerified     bool
 	Status          string
 	FailedAttempts  int
+	Phone           string // необязательный контакт; хранится зашифрованным
 	Roles           []string
 	RegionCodes     []string
 	DepartmentCodes []string
@@ -29,6 +31,7 @@ type AdminUserView struct {
 type UpdateUserInput struct {
 	IINVerified   *bool
 	Status        *string
+	Phone         *string // пустая строка очищает номер
 	RoleIDs       *[]string
 	RegionIDs     *[]string
 	DepartmentIDs *[]string
@@ -40,6 +43,10 @@ func (s *Service) buildUserView(ctx context.Context, u *domain.User) (AdminUserV
 		return AdminUserView{}, err
 	}
 	iin, err := s.cipher.DecryptString(u.IINEnc)
+	if err != nil {
+		return AdminUserView{}, err
+	}
+	phone, err := s.cipher.DecryptString(u.PhoneEnc)
 	if err != nil {
 		return AdminUserView{}, err
 	}
@@ -62,6 +69,7 @@ func (s *Service) buildUserView(ctx context.Context, u *domain.User) (AdminUserV
 		FullName:        fullName,
 		IINMasked:       maskIIN(iin),
 		IINVerified:     u.IINVerified,
+		Phone:           phone,
 		Status:          u.Status,
 		FailedAttempts:  u.FailedAttempts,
 		Roles:           roleCodes,
@@ -141,6 +149,14 @@ func (s *Service) UpdateUser(ctx context.Context, id string, in UpdateUserInput)
 	}
 	if in.Status != nil {
 		u.Status = *in.Status
+	}
+	// телефон необязателен: пустая строка очищает поле
+	if in.Phone != nil {
+		enc, err := s.cipher.EncryptString(strings.TrimSpace(*in.Phone))
+		if err != nil {
+			return err
+		}
+		u.PhoneEnc = enc
 	}
 	if err := s.users.Update(ctx, u); err != nil {
 		return err

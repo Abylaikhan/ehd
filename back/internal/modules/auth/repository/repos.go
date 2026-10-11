@@ -114,6 +114,7 @@ func (r *UserRepo) Update(ctx context.Context, u *domain.User) error {
 	return r.db.WithContext(ctx).Model(&UserModel{}).Where("id = ?", uid).
 		Updates(map[string]any{
 			"email":                    u.Email,
+			"phone_enc":                u.PhoneEnc, // необязательный контакт (спека 020)
 			"iin_verified":             u.IINVerified,
 			"status":                   u.Status,
 			"password_hash":            u.PasswordHash,

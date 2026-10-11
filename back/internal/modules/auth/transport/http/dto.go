@@ -39,6 +39,7 @@ type createRoleReq struct {
 type updateUserReq struct {
 	IINVerified   *bool     `json:"iin_verified"`
 	Status        *string   `json:"status"`
+	Phone         *string   `json:"phone"` // необязательный; "" очищает
 	RoleIDs       *[]string `json:"role_ids"`
 	RegionIDs     *[]string `json:"region_ids"`
 	DepartmentIDs *[]string `json:"department_ids"`
@@ -70,6 +71,7 @@ type userView struct {
 	FullName        string    `json:"full_name"`
 	IINMasked       string    `json:"iin_masked"`
 	IINVerified     bool      `json:"iin_verified"`
+	Phone           string    `json:"phone"`
 	Status          string    `json:"status"`
 	FailedAttempts  int       `json:"failed_attempts"`
 	Roles           []string  `json:"roles"`
