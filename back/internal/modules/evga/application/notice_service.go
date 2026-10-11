@@ -15,7 +15,7 @@ type NoticeRepoPort interface {
 	Preview(ctx context.Context, ids []int64, deptID *int64) ([]domain.NoticeGroup, []domain.RejectedRecord, error)
 	SearchCli(ctx context.Context, q string) ([]domain.CliOrg, error)
 	CreateNotices(ctx context.Context, groups []domain.CreateGroupInput, deptID *int64, ownerDeptID int64, createdBy *int64, noticeTxt string) ([]domain.CreatedNotice, []domain.RejectedRecord, error)
-	ListNotices(ctx context.Context, deptID, filterDept, statusID *int64, docnum string, page domain.Page) ([]domain.NoticeListItem, int64, error)
+	ListNotices(ctx context.Context, deptID *int64, f domain.NoticeFilter, page domain.Page) ([]domain.NoticeListItem, int64, error)
 	GetNotice(ctx context.Context, id int64, deptID *int64) (domain.NoticeCard, error)
 	DeleteNotice(ctx context.Context, id int64, deptID *int64) error
 }
@@ -154,7 +154,7 @@ func (s *NoticeService) Create(ctx context.Context, id contract.Identity, groups
 }
 
 // List — список уведомлений (spec FR-7): аудитор — свои; куратор/админ — все + фильтр.
-func (s *NoticeService) List(ctx context.Context, id contract.Identity, filterDept, statusID *int64, docnum string, page domain.Page) ([]domain.NoticeListItem, int64, domain.DepartmentScope, error) {
+func (s *NoticeService) List(ctx context.Context, id contract.Identity, f domain.NoticeFilter, page domain.Page) ([]domain.NoticeListItem, int64, domain.DepartmentScope, error) {
 	scope, err := s.scopes.Scope(ctx, id)
 	if err != nil {
 		return nil, 0, scope, err
@@ -164,9 +164,9 @@ func (s *NoticeService) List(ctx context.Context, id contract.Identity, filterDe
 	}
 	deptID := deptFilter(scope)
 	if deptID != nil {
-		filterDept = nil
+		f.DepartmentID = nil
 	}
-	items, total, err := s.repo.ListNotices(ctx, deptID, filterDept, statusID, docnum, page)
+	items, total, err := s.repo.ListNotices(ctx, deptID, f, page)
 	if err != nil {
 		return nil, 0, scope, err
 	}

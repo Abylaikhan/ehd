@@ -101,7 +101,11 @@ export function useEvga() {
   const noticeCreate = (groups: { record_ids: number[]; its_cli_ids: number[] }[]) =>
     api<EvgaNoticeCreateResult>('/api/v1/evga/notices', { method: 'POST', body: { groups } })
 
-  const noticeList = (p: { page?: number; page_size?: number; status_id?: number | null; docnum?: string; department_id?: number | null }) =>
+  // колоночный поиск списка уведомлений (backend-спека 019)
+  const noticeList = (p: {
+    page?: number; page_size?: number; status_id?: number | null; docnum?: string
+    department_id?: number | null; gu?: string; sendername?: string; recipient?: string; status_title?: string
+  }) =>
     api<EvgaNoticeListResponse>('/api/v1/evga/notices', { query: toQuery(p as EvgaRegistryParams) })
 
   const noticeGet = (id: number) => api<EvgaNoticeCard>(`/api/v1/evga/notices/${id}`)

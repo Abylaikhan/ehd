@@ -337,21 +337,34 @@ func (r noticeListRow) toDomain() domain.NoticeListItem {
 }
 
 // ListNotices — уведомления департамента/всех (spec 009 FR-7).
-func (nr *NoticeRepo) ListNotices(ctx context.Context, deptID, filterDept, statusID *int64, docnum string, page domain.Page) ([]domain.NoticeListItem, int64, error) {
+func (nr *NoticeRepo) ListNotices(ctx context.Context, deptID *int64, f domain.NoticeFilter, page domain.Page) ([]domain.NoticeListItem, int64, error) {
 	base := func() *gorm.DB {
 		q := nr.db.WithContext(ctx).Table("its_risk_notice n").
 			Joins(noticeListJoins).
 			Where(`n."in$trash" is null`)
 		if deptID != nil {
 			q = q.Where("n.its_departments_id = ?", *deptID)
-		} else if filterDept != nil {
-			q = q.Where("n.its_departments_id = ?", *filterDept)
+		} else if f.DepartmentID != nil {
+			q = q.Where("n.its_departments_id = ?", *f.DepartmentID)
 		}
-		if statusID != nil {
-			q = q.Where("rq.stat_id = ?", *statusID)
+		if f.StatusID != nil {
+			q = q.Where("rq.stat_id = ?", *f.StatusID)
 		}
-		if docnum != "" {
-			q = q.Where("rq.docnum ilike ?", "%"+docnum+"%")
+		if f.Docnum != "" {
+			q = q.Where("rq.docnum ilike ?", "%"+f.Docnum+"%")
+		}
+		// колоночный поиск (спека 019 FR-1): агрегаты снимка и адресата — в LATERAL-подзапросах
+		if f.GU != "" {
+			q = q.Where("agg.gu ilike ?", "%"+f.GU+"%")
+		}
+		if f.SenderName != "" {
+			q = q.Where("agg.sendername ilike ?", "%"+f.SenderName+"%")
+		}
+		if f.Recipient != "" {
+			q = q.Where("rc.title ilike ?", "%"+f.Recipient+"%")
+		}
+		if f.StatusTitle != "" {
+			q = q.Where("st.title ilike ?", "%"+f.StatusTitle+"%")
 		}
 		return q
 	}
