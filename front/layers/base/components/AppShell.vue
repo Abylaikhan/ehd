@@ -20,6 +20,21 @@ const { data: navTree } = useAsyncData('reporter-nav', () =>
     : Promise.resolve([] as MenuNode[]),
 )
 
+// Доступные пользователю витрины: backend отдаёт каталог уже отфильтрованным по правам
+// (ListForUser). Раздел Reporter показываем по факту доступа, а не по списку ролей —
+// новая роль с доступом к витрине заработает без правок кода.
+const { data: userViews } = useAsyncData('reporter-user-views', () =>
+  session.isAuthenticated
+    ? reporterViews
+        .list()
+        .then((r) => r.items)
+        .catch(() => [])
+    : Promise.resolve([]),
+)
+const hasReporterAccess = computed(
+  () => session.isAdmin || (userViews.value?.length ?? 0) > 0 || (navTree.value?.length ?? 0) > 0,
+)
+
 type NavLeaf = { label: string; icon: string; to: string }
 function collectLeaves(node: MenuNode): NavLeaf[] {
   const out: NavLeaf[] = []
@@ -31,22 +46,28 @@ function collectLeaves(node: MenuNode): NavLeaf[] {
 }
 
 const sections = computed(() => {
-  const list: { title: string; items: NavLeaf[] }[] = [
-    { title: 'Обзор', items: [{ label: 'Панель мониторинга', icon: 'pi pi-th-large', to: '/' }] },
-  ]
+  const list: { title: string; items: NavLeaf[] }[] = []
 
-  // Reporter: каталог витрин + пункты-ссылки верхнего уровня из меню
-  const reporterItems: NavLeaf[] = [{ label: 'Витрины', icon: 'pi pi-table', to: '/reporter' }]
-  const menuSections: { title: string; items: NavLeaf[] }[] = []
-  for (const n of navTree.value ?? []) {
-    if (n.to) reporterItems.push({ label: n.title, icon: n.icon || 'pi pi-table', to: n.to })
-    else {
-      const items = collectLeaves(n)
-      if (items.length) menuSections.push({ title: n.title, items })
-    }
+  // «Панель мониторинга» — состояние компонентов стенда (readyz, ping-и): только администратору.
+  if (session.isAdmin) {
+    list.push({ title: 'Обзор', items: [{ label: 'Панель мониторинга', icon: 'pi pi-th-large', to: '/' }] })
   }
-  list.push({ title: 'Reporter', items: reporterItems })
-  list.push(...menuSections)
+
+  // Reporter: каталог витрин + пункты-ссылки верхнего уровня из меню.
+  // Скрываем целиком, если доступных витрин нет (например, у аудитора ОБМ ЭВГА).
+  if (hasReporterAccess.value) {
+    const reporterItems: NavLeaf[] = [{ label: 'Витрины', icon: 'pi pi-table', to: '/reporter' }]
+    const menuSections: { title: string; items: NavLeaf[] }[] = []
+    for (const n of navTree.value ?? []) {
+      if (n.to) reporterItems.push({ label: n.title, icon: n.icon || 'pi pi-table', to: n.to })
+      else {
+        const items = collectLeaves(n)
+        if (items.length) menuSections.push({ title: n.title, items })
+      }
+    }
+    list.push({ title: 'Reporter', items: reporterItems })
+    list.push(...menuSections)
+  }
 
   // ОБМ ЭВГА: раздел виден по ролям модуля; backend авторизует повторно (спека 005-evga-registry-ui)
   const roles = session.user?.roles ?? []

@@ -1,7 +1,16 @@
 <script setup lang="ts">
 // Дашборд состояния sandbox: hero-сводка + KPI-плитки компонентов.
+// Экран технический (readyz, ping компонентов) и доступен только администратору;
+// остальных уводим на их рабочий раздел, иначе после входа они упираются в чужой экран.
 type Status = 'good' | 'warning' | 'critical' | 'unknown'
 const api = useApi()
+
+const session = useSessionStore()
+if (session.isAuthenticated && !session.isAdmin) {
+  const roles = session.user?.roles ?? []
+  const target = roles.includes('evga_auditor') || roles.includes('evga_curator') ? '/evga' : '/reporter'
+  await navigateTo(target, { replace: true })
+}
 
 const { data: ready, error: readyError, pending, refresh } = await useAsyncData(
   'readyz',
