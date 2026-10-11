@@ -1,0 +1,8 @@
+Tinos (c) Steve Matteson, distributed by Google Fonts.
+Licensed under the Apache License, Version 2.0.
+Full text: http://www.apache.org/licenses/LICENSE-2.0
+
+Tinos is metrically compatible with Times New Roman: документы, свёрстанные
+под Times New Roman, сохраняют разбивку строк и страниц. Шрифт выбран вместо
+Times New Roman (Monotype), т.к. последний проприетарный и его нельзя
+встраивать в состав приложения.

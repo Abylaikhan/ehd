@@ -158,6 +158,14 @@ export function useEvga() {
       { method: 'POST' },
     )
 
+  // PDF для предпросмотра в модальном окне: blob-URL, который подставляется в <iframe>.
+  // Вызывающий обязан освободить URL через URL.revokeObjectURL при закрытии окна.
+  const noticePDFUrl = async (noticeId: number) => {
+    const res = await api.raw(`/api/v1/evga/notices/${noticeId}/pdf`, { responseType: 'blob' })
+    const blob = res._data as Blob
+    return URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }))
+  }
+
   // PDF уведомления по образцу (backend-спека 012): blob + скачивание браузером
   const noticePDF = async (noticeId: number) => {
     const res = await api.raw(`/api/v1/evga/notices/${noticeId}/pdf`, { responseType: 'blob' })
@@ -177,7 +185,7 @@ export function useEvga() {
     registry, card, references, exportRegistry, changeStatus, bulkStatus, history,
     noticePreview, noticeCreate, noticeList, noticeGet, noticeDelete, noticeSetComment, cliSearch,
     routeGet, routePut, participants, noticeSubmit, approveChallenge, noticeApprove, noticeReject,
-    noticeOutgoing, noticeOut, noticePDF, noticeSendESEDO,
+    noticeOutgoing, noticeOut, noticePDF, noticePDFUrl, noticeSendESEDO,
   }
 }
 
