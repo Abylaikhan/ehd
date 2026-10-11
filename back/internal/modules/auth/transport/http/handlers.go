@@ -166,7 +166,7 @@ func (h *Handler) adminUpdateUser(c *fiber.Ctx) error {
 		return badRequest("body", "invalid_json")
 	}
 	err := h.svc.UpdateUser(c.UserContext(), c.Params("id"), application.UpdateUserInput{
-		IINVerified: req.IINVerified, Status: req.Status,
+		IINVerified: req.IINVerified, Status: req.Status, Phone: req.Phone,
 		RoleIDs: req.RoleIDs, RegionIDs: req.RegionIDs, DepartmentIDs: req.DepartmentIDs,
 	})
 	if err != nil {
@@ -271,7 +271,7 @@ func (h *Handler) mapErr(err error) error {
 func toUserView(v application.AdminUserView) userView {
 	return userView{
 		ID: v.ID, Login: v.Login, Email: v.Email, FullName: v.FullName, IINMasked: v.IINMasked,
-		IINVerified: v.IINVerified, Status: v.Status, FailedAttempts: v.FailedAttempts,
+		IINVerified: v.IINVerified, Phone: v.Phone, Status: v.Status, FailedAttempts: v.FailedAttempts,
 		Roles: emptyIfNil(v.Roles), RegionCodes: emptyIfNil(v.RegionCodes), DepartmentCodes: emptyIfNil(v.DepartmentCodes),
 		CreatedAt: v.CreatedAt,
 	}

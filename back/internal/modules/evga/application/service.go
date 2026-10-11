@@ -187,6 +187,56 @@ func (s *Service) UserDepartment(ctx context.Context, actor contract.Identity, u
 	return s.userDept.Get(ctx, userID)
 }
 
+// UserDeptInfo — эффективный департамент пользователя для списка админки (спека 020).
+// Source: "override" — задан администратором, "iin" — выведен по ИИН из obm_evga.
+type UserDeptInfo struct {
+	DepartmentID    int64
+	DepartmentTitle string
+	Source          string
+}
+
+// UsersDepartments — эффективные департаменты пачкой, для колонки в списке пользователей
+// (спека 020 FR-2). Только админ. Пользователи без привязки в результат не попадают.
+func (s *Service) UsersDepartments(ctx context.Context, actor contract.Identity, userIDs []string) (map[string]UserDeptInfo, error) {
+	if !actor.IsAdmin {
+		return nil, ErrCuratorReadOnly
+	}
+	out := make(map[string]UserDeptInfo, len(userIDs))
+	if len(userIDs) == 0 {
+		return out, nil
+	}
+	// справочник департаментов тянем один раз на всю пачку
+	deps, err := s.repo.Departments(ctx)
+	if err != nil {
+		return nil, s.wrapSourceErr(ctx, err)
+	}
+	titles := make(map[int64]string, len(deps))
+	for _, d := range deps {
+		titles[d.ID] = d.Title
+	}
+
+	for _, uid := range userIDs {
+		// 1) переопределение из админки (спека 016)
+		if s.userDept != nil {
+			if id, err := s.userDept.Get(ctx, uid); err == nil && id != nil {
+				out[uid] = UserDeptInfo{DepartmentID: *id, DepartmentTitle: titles[*id], Source: "override"}
+				continue
+			}
+		}
+		// 2) иначе — резолв по ИИН из obm_evga.users (ИИН не логируем)
+		iin, verified, err := s.iin.UserIIN(ctx, uid)
+		if err != nil || !verified || iin == "" {
+			continue
+		}
+		id, title, err := s.repo.DepartmentByUserIIN(ctx, iin)
+		if err != nil || id == nil {
+			continue
+		}
+		out[uid] = UserDeptInfo{DepartmentID: *id, DepartmentTitle: title, Source: "iin"}
+	}
+	return out, nil
+}
+
 // SetUserDepartment — назначить (deptID != nil) или снять (nil) привязку (спека 016 FR-3/FR-4).
 func (s *Service) SetUserDepartment(ctx context.Context, actor contract.Identity, userID string, deptID *int64) error {
 	if !actor.IsAdmin {

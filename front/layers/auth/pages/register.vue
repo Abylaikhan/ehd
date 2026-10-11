@@ -73,6 +73,11 @@ const submit = async () => {
         <small v-if="errors.email" class="err">{{ errors.email }}</small>
       </div>
       <div class="field">
+        <!-- телефон необязателен: валидации нет, пустое значение допустимо -->
+        <label for="phone">Телефон <span class="optional">(необязательно)</span></label>
+        <InputText id="phone" v-model="form.phone" placeholder="+7 (___) ___-__-__" autocomplete="tel" />
+      </div>
+      <div class="field">
         <label for="login">Логин</label>
         <InputText id="login" v-model="form.login" autocomplete="username" :invalid="!!errors.login" />
         <small v-if="errors.login" class="err">{{ errors.login }}</small>
@@ -90,6 +95,7 @@ const submit = async () => {
 </template>
 
 <style scoped>
+.optional { color: var(--ehd-muted); font-weight: 400; }
 .auth-card {
   width: 100%;
   max-width: 440px;
