@@ -433,6 +433,49 @@ func (nr *NoticeRepo) GetNotice(ctx context.Context, id int64, deptID *int64) (d
 			AmountPart: r.AmountPart, GU: r.GU, GUBIN: r.GUBIN, SenderName: r.SenderName,
 		})
 	}
+
+	// реквизиты формы: инициатор и привязанное исходящее письмо (спека 018 FR-1)
+	var extra []struct {
+		Initiator  string
+		OutDocNum  string
+		OutDocDate *time.Time
+	}
+	if err := nr.db.WithContext(ctx).Table("its_risk_notice n").
+		Select(`coalesce(u.short_name, u.login, '') as initiator,
+			coalesce(o.doc_num,'') as out_doc_num, o.doc_date as out_doc_date`).
+		Joins(`left join users u on u.id = n.created_by`).
+		Joins(`left join its_out o on o.id = n.its_out_id`).
+		Where("n.id = ?", id).
+		Limit(1).Scan(&extra).Error; err != nil {
+		return domain.NoticeCard{}, err
+	}
+	if len(extra) > 0 {
+		card.Initiator = extra[0].Initiator
+		card.OutDocNum = extra[0].OutDocNum
+		card.OutDocDate = extra[0].OutDocDate
+	}
+
+	// адресаты с порядковым номером (спека 018 FR-1)
+	var recs []struct {
+		NN    *int
+		CliID int64
+		Title string
+	}
+	if err := nr.db.WithContext(ctx).Table("its_risk_notice_recepient r").
+		Select(`r.nn, r.its_cli_id as cli_id, coalesce(c.title,'') as title`).
+		Joins(`join its_cli c on c.id = r.its_cli_id`).
+		Where(`r.its_risk_notice_id = ? and r."in$trash" is null`, id).
+		Order("r.nn nulls last, r.id").
+		Scan(&recs).Error; err != nil {
+		return domain.NoticeCard{}, err
+	}
+	for i, r := range recs {
+		nn := i + 1
+		if r.NN != nil {
+			nn = *r.NN
+		}
+		card.Recipients = append(card.Recipients, domain.NoticeRecipient{NN: nn, CliID: r.CliID, Title: r.Title})
+	}
 	return card, nil
 }
 

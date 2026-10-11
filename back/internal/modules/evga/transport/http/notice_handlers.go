@@ -198,10 +198,41 @@ func (h *Handler) noticeGet(c *fiber.Ctx) error {
 			"amount_part": r.AmountPart, "gu": r.GU, "gu_bin": r.GUBIN, "sendername": r.SenderName,
 		}
 	}
+	// адресаты с порядковым номером (спека 018 FR-1)
+	recipients := make([]fiber.Map, len(card.Recipients))
+	for i, r := range card.Recipients {
+		recipients[i] = fiber.Map{"nn": r.NN, "cli_id": r.CliID, "title": r.Title}
+	}
 	resp := fiber.Map{
 		"header": toNoticeItemResp(card.NoticeListItem), "notice_txt": card.NoticeTxt, "rows": rows,
+		// реквизиты действующей формы (спека 018 FR-1)
+		"initiator":    card.Initiator,
+		"out_doc_num":  card.OutDocNum,
+		"out_doc_date": fmtDatePtr(card.OutDocDate),
+		"recipients":   recipients,
+		"comment":      card.Comment,
 	}
 	return c.JSON(resp)
+}
+
+// noticeSetComment — PUT /notices/:id/comment (спека 018 FR-2).
+func (h *Handler) noticeSetComment(c *fiber.Ctx) error {
+	id, err := strconv.ParseInt(c.Params("id"), 10, 64)
+	if err != nil {
+		return httpserver.NewError(fiber.StatusBadRequest, "INVALID_FILTER", "Некорректный идентификатор",
+			httpserver.ErrorDetail{Field: "id", Reason: "not_an_integer"})
+	}
+	var req struct {
+		Comment string `json:"comment"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return httpserver.NewError(fiber.StatusBadRequest, "INVALID_FILTER", "Некорректное тело запроса",
+			httpserver.ErrorDetail{Field: "body", Reason: "invalid_json"})
+	}
+	if err := h.notices.SetComment(c.UserContext(), identityFrom(c), id, req.Comment); err != nil {
+		return mapErr(err)
+	}
+	return c.JSON(fiber.Map{"comment": req.Comment})
 }
 
 // noticeDelete — DELETE /notices/:id (spec 009 FR-9).

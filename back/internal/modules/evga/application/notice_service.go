@@ -25,6 +25,12 @@ type UserResolver interface {
 	UserIDByIIN(ctx context.Context, iin string) (*int64, error)
 }
 
+// NoticeMetaPort — реквизиты уведомления в БД ЕХД (комментарий, спека 018 FR-2).
+type NoticeMetaPort interface {
+	Comment(ctx context.Context, noticeID int64) (string, error)
+	SetComment(ctx context.Context, noticeID int64, comment string) error
+}
+
 // NoticeService — формирование и просмотр уведомлений (спека 009 FR-10).
 type NoticeService struct {
 	repo         NoticeRepoPort
@@ -32,7 +38,12 @@ type NoticeService struct {
 	scopes       ScopeProvider
 	writeEnabled bool
 	log          *zap.Logger
+	// реквизиты уведомления в БД ЕХД (комментарий, спека 018); nil — функция не подключена
+	meta NoticeMetaPort
 }
+
+// SetMetaRepo подключает хранилище реквизитов уведомления (спека 018 FR-2).
+func (s *NoticeService) SetMetaRepo(r NoticeMetaPort) { s.meta = r }
 
 func NewNoticeService(repo NoticeRepoPort, users UserResolver, scopes ScopeProvider, writeEnabled bool, log *zap.Logger) *NoticeService {
 	return &NoticeService{repo: repo, users: users, scopes: scopes, writeEnabled: writeEnabled, log: log}
@@ -162,7 +173,7 @@ func (s *NoticeService) List(ctx context.Context, id contract.Identity, filterDe
 	return items, total, scope, nil
 }
 
-// Get — карточка уведомления (spec FR-8).
+// Get — карточка уведомления (spec FR-8) + комментарий из БД ЕХД (спека 018 FR-1).
 func (s *NoticeService) Get(ctx context.Context, id contract.Identity, noticeID int64) (domain.NoticeCard, error) {
 	scope, err := s.scopes.Scope(ctx, id)
 	if err != nil {
@@ -171,7 +182,33 @@ func (s *NoticeService) Get(ctx context.Context, id contract.Identity, noticeID 
 	if scope.Unmapped {
 		return domain.NoticeCard{}, domain.ErrNotFound
 	}
-	return s.repo.GetNotice(ctx, noticeID, deptFilter(scope))
+	card, err := s.repo.GetNotice(ctx, noticeID, deptFilter(scope))
+	if err != nil {
+		return domain.NoticeCard{}, err
+	}
+	if s.meta != nil {
+		if c, err := s.meta.Comment(ctx, noticeID); err == nil {
+			card.Comment = c
+		}
+	}
+	return card, nil
+}
+
+// SetComment — сохранить комментарий к уведомлению (спека 018 FR-2).
+// Доступ как у прочих изменений: аудитор/админ при включённом режиме записи.
+func (s *NoticeService) SetComment(ctx context.Context, id contract.Identity, noticeID int64, comment string) error {
+	deptID, _, _, err := s.auditorScope(ctx, id, true)
+	if err != nil {
+		return err
+	}
+	// проверяем, что уведомление в зоне видимости пользователя
+	if _, err := s.repo.GetNotice(ctx, noticeID, deptID); err != nil {
+		return err
+	}
+	if s.meta == nil {
+		return domain.ErrNotFound
+	}
+	return s.meta.SetComment(ctx, noticeID, strings.TrimSpace(comment))
 }
 
 // Delete — удаление проекта (spec FR-9).

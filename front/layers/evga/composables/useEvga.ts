@@ -103,6 +103,10 @@ export function useEvga() {
   const noticeDelete = (id: number) =>
     api<{ deleted: boolean }>(`/api/v1/evga/notices/${id}`, { method: 'DELETE' })
 
+  // комментарий к уведомлению (backend-спека 018 FR-2)
+  const noticeSetComment = (id: number, comment: string) =>
+    api<{ comment: string }>(`/api/v1/evga/notices/${id}/comment`, { method: 'PUT', body: { comment } })
+
   const cliSearch = (q: string) =>
     api<{ items: EvgaCliOrg[] }>('/api/v1/evga/cli', { query: { q } })
 
@@ -171,7 +175,7 @@ export function useEvga() {
 
   return {
     registry, card, references, exportRegistry, changeStatus, bulkStatus, history,
-    noticePreview, noticeCreate, noticeList, noticeGet, noticeDelete, cliSearch,
+    noticePreview, noticeCreate, noticeList, noticeGet, noticeDelete, noticeSetComment, cliSearch,
     routeGet, routePut, participants, noticeSubmit, approveChallenge, noticeApprove, noticeReject,
     noticeOutgoing, noticeOut, noticePDF, noticeSendESEDO,
   }

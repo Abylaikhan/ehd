@@ -197,6 +197,11 @@ func Run(cfg *config.Config) error {
 		evgaStatusService = evgaapp.NewStatusService(evgaStatusRepo, evgaService, cfg.EVGA.WriteEnabled, log)
 		evgaNoticeService = evgaapp.NewNoticeService(
 			evgarepo.NewNoticeRepo(evgaDB), evgaStatusRepo, evgaService, cfg.EVGA.WriteEnabled, log)
+		// комментарий к уведомлению хранится в БД ЕХД (спека 018 FR-2)
+		if err := evgarepo.MigrateNoticeMeta(db); err != nil {
+			return err
+		}
+		evgaNoticeService.SetMetaRepo(evgarepo.NewNoticeMetaRepo(db))
 
 		// маршрут согласования живёт в БД ЕХД (спека 010 ADR), не в obm_evga
 		if err := evgarepo.MigrateRoute(db); err != nil {
