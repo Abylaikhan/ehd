@@ -152,15 +152,19 @@ func (s *ApprovalService) actorMeta(ctx context.Context, id contract.Identity, n
 }
 
 // RouteView — маршрут: шаблон + ход исполнения (FR-1).
+// CanApprove / CanCreateOutgoing — доступность действий для текущего пользователя
+// (спека 017): повторяют серверную авторизацию, чтобы UI не показывал чужие кнопки.
 type RouteView struct {
-	Editable bool
-	Template []domain.RouteStep
-	History  []domain.RouteStep
+	Editable          bool
+	Template          []domain.RouteStep
+	History           []domain.RouteStep
+	CanApprove        bool
+	CanCreateOutgoing bool
 }
 
 // Route — просмотр маршрута; доступен всем ролям модуля в пределах видимости.
 func (s *ApprovalService) Route(ctx context.Context, id contract.Identity, noticeID int64) (RouteView, error) {
-	meta, _, err := s.actorMeta(ctx, id, noticeID, false)
+	meta, actor, err := s.actorMeta(ctx, id, noticeID, false)
 	if err != nil {
 		return RouteView{}, err
 	}
@@ -187,7 +191,27 @@ func (s *ApprovalService) Route(ctx context.Context, id contract.Identity, notic
 			history = append(history, st)
 		}
 	}
-	return RouteView{Editable: editableState(meta.StatID), Template: tpl, History: history}, nil
+	// доступность действий текущему пользователю (спека 017): те же условия, что в Approve/Reject
+	// и OutgoingService.CreateOutgoing — исполнителем открытого шага может быть только один человек.
+	canApprove, canOutgoing := false, false
+	if s.writeEnabled && meta.StatID != nil {
+		if open, err := s.route.OpenStep(ctx, noticeID); err == nil && open != nil {
+			isAssignee := actor != nil && *actor == open.AssigneeObmID
+			switch open.Kind {
+			case domain.RouteKindApprove:
+				// согласование/отказ — строго назначенный согласующий (без исключения для админа)
+				canApprove = *meta.StatID == domain.ReqStatApproving && isAssignee
+			case domain.RouteKindOutgoing:
+				// исходящее — ответственный за шаг либо администратор
+				canOutgoing = *meta.StatID == domain.ReqStatSigning && (isAssignee || id.IsAdmin)
+			}
+		}
+	}
+
+	return RouteView{
+		Editable: editableState(meta.StatID), Template: tpl, History: history,
+		CanApprove: canApprove, CanCreateOutgoing: canOutgoing,
+	}, nil
 }
 
 // SaveRoute — редактирование шаблона маршрута (FR-2/3).

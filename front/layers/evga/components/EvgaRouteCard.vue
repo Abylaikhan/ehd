@@ -103,11 +103,11 @@ async function submit() {
 }
 
 // --- решения согласующего ---
-const isApproving = computed(() => props.statusId === 2)
-// этап «Создать исходящее» (спека 011): статус «На подписании» + открытый шаг outgoing
-const hasOpenOutgoing = computed(
-  () => props.statusId === 5 && (route.value?.history ?? []).some((s) => s.kind === 'outgoing' && s.status === 'open'),
-)
+// Доступность действий приходит с бэкенда (спека 017): кнопки видит только исполнитель
+// открытого шага — согласующий не видит «Создать исходящее», инициатор не видит
+// «Согласовать/Вернуть», если он сам не указан согласующим.
+const isApproving = computed(() => (route.value?.can_approve ?? false) && props.canWrite)
+const hasOpenOutgoing = computed(() => (route.value?.can_create_outgoing ?? false) && props.canWrite)
 
 async function createOutgoing() {
   busy.value = true

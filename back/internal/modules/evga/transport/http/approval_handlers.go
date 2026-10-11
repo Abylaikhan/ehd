@@ -104,7 +104,12 @@ func (h *Handler) routeGet(c *fiber.Ctx) error {
 	for i, s := range view.History {
 		hist[i] = toRouteStepResp(s)
 	}
-	return c.JSON(fiber.Map{"editable": view.Editable, "template": tpl, "history": hist})
+	return c.JSON(fiber.Map{
+		"editable": view.Editable, "template": tpl, "history": hist,
+		// доступность действий текущему пользователю (спека 017)
+		"can_approve":         view.CanApprove,
+		"can_create_outgoing": view.CanCreateOutgoing,
+	})
 }
 
 type routePutReq struct {
