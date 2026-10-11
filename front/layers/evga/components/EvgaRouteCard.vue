@@ -243,7 +243,7 @@ const fmtTS = (v: string | null) => (v ? new Date(v).toLocaleString('ru-RU') : '
 
       <template v-if="route && route.history.length">
         <p class="section-label">Ход исполнения</p>
-        <DataTable :value="route.history" size="small" striped-rows class="hist-table">
+        <DataTable show-gridlines :value="route.history" size="small" striped-rows class="hist-table">
           <Column header="Раунд" field="round" :style="{ width: '5rem' }" />
           <Column header="Этап">
             <template #body="{ data: s }">{{ kindLabel(s) }}</template>

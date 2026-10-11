@@ -1,4 +1,4 @@
-// Package http — маршруты модуля ОБМ ЕВГА под /api/v1/evga (спека 007).
+// Package http — маршруты модуля ОБМ ЭВГА под /api/v1/evga (спека 007).
 package http
 
 import (
@@ -17,7 +17,7 @@ const sessionCookie = "ehd_session"
 // identityKey — ключ доверенной личности в Locals (локальный для evga).
 const identityKey = "evga_identity"
 
-// Guard — авторизация маршрутов ЕВГА через auth/contract (без сети).
+// Guard — авторизация маршрутов ЭВГА через auth/contract (без сети).
 type Guard struct{ provider contract.Provider }
 
 func NewGuard(p contract.Provider) *Guard { return &Guard{provider: p} }
@@ -43,7 +43,7 @@ func (g *Guard) RequireModule(c *fiber.Ctx) error {
 		return httpserver.NewError(fiber.StatusUnauthorized, "UNAUTHENTICATED", "Сессия недействительна или истекла")
 	}
 	if !application.HasModuleAccess(id) {
-		return httpserver.NewError(fiber.StatusForbidden, "ACCESS_DENIED", "Нет доступа к модулю ОБМ ЕВГА")
+		return httpserver.NewError(fiber.StatusForbidden, "ACCESS_DENIED", "Нет доступа к модулю ОБМ ЭВГА")
 	}
 	c.Locals(identityKey, id)
 	return c.Next()

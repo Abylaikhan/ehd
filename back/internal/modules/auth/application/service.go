@@ -245,7 +245,7 @@ func (s *Service) CurrentUser(ctx context.Context, token string) (contract.Ident
 }
 
 // UserIIN — расшифрованный ИИН пользователя для внутрипроцессного сопоставления
-// (contract.Provider; модуль ЕВГА, спека 007 FR-3). Пустой ИИН — если не заполнен.
+// (contract.Provider; модуль ЭВГА, спека 007 FR-3). Пустой ИИН — если не заполнен.
 func (s *Service) UserIIN(ctx context.Context, userID string) (string, bool, error) {
 	u, err := s.users.GetByID(ctx, userID)
 	if err != nil {

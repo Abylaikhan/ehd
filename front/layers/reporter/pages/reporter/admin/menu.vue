@@ -153,7 +153,7 @@ async function remove(it: MenuItem) {
     <Message v-if="error" severity="error" :closable="false" class="mb">Не удалось загрузить меню</Message>
     <Message v-if="actionError" severity="error" :closable="true" class="mb">{{ actionError }}</Message>
 
-    <DataTable :value="items" :loading="pending" data-key="id" size="small">
+    <DataTable show-gridlines :value="items" :loading="pending" data-key="id" size="small">
       <template #empty><div class="empty">Пунктов меню пока нет</div></template>
       <Column header="Наименование">
         <template #body="{ data: it }">

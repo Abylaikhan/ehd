@@ -240,6 +240,7 @@ const pageSizeOptions = computed(() => {
           <Message v-if="actionError" severity="error" :closable="true" class="action-error">{{ actionError }}</Message>
 
           <DataTable
+show-gridlines
             :value="rows"
             :loading="tableLoading"
             lazy

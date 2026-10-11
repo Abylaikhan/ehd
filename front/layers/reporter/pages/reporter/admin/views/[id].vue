@@ -196,7 +196,7 @@ async function doPreview() {
       <Card class="mb">
         <template #title><div class="card-title">Колонки<Button label="Сохранить колонки" icon="pi pi-save" size="small" :loading="saving === 'columns'" @click="saveColumns" /></div></template>
         <template #content>
-          <DataTable :value="columns" data-key="source_name" size="small" scrollable>
+          <DataTable show-gridlines :value="columns" data-key="source_name" size="small" scrollable>
             <Column header="Код (ClickHouse)"><template #body="{ data: c }"><code>{{ c.source_name }}</code></template></Column>
             <Column header="Тип источника"><template #body="{ data: c }"><span class="muted">{{ c.source_type }}</span></template></Column>
             <Column header="Наименование" style="min-width: 12rem">
@@ -341,7 +341,7 @@ async function doPreview() {
         <template #title><div class="card-title">Предпросмотр<Button label="Обновить предпросмотр" icon="pi pi-eye" size="small" :loading="previewing" @click="doPreview" /></div></template>
         <template #content>
           <EmptyState v-if="!preview" icon="pi pi-eye" title="Нажмите «Обновить предпросмотр»" hint="Первые строки текущей конфигурации (как администратор, без RLS)." />
-          <DataTable v-else :value="preview.rows" size="small" scrollable>
+          <DataTable show-gridlines v-else :value="preview.rows" size="small" scrollable>
             <Column v-for="col in preview.columns" :key="col.source_name" :header="col.label">
               <template #body="{ data }">{{ formatCell(data[col.source_name], col.display_type) }}</template>
             </Column>

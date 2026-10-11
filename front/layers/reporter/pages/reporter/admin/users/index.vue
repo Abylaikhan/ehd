@@ -35,7 +35,7 @@ const { data: roles } = await useAsyncData('ref-roles', () => api<ItemsResponse<
 const { data: regions } = await useAsyncData('ref-regions', () => api<ItemsResponse<Reference>>('/api/v1/auth/admin/regions'))
 const { data: departments } = await useAsyncData('ref-departments', () => api<ItemsResponse<Reference>>('/api/v1/auth/admin/departments'))
 
-// Департаменты ДВГА модуля ОБМ ЕВГА (спека 016): админу приходят в /evga/references.
+// Департаменты ДВГА модуля ОБМ ЭВГА (спека 016): админу приходят в /evga/references.
 // Если модуль выключен — список пустой и поле скрыто.
 const { data: evgaRefs } = await useAsyncData('ref-evga-departments', async () => {
   try {
@@ -164,6 +164,7 @@ const issueTempPassword = async (u: UserView) => {
     <Message v-if="actionError" severity="error" :closable="true" class="mb">{{ actionError }}</Message>
 
     <DataTable
+show-gridlines
       :value="items"
       lazy
       paginator
@@ -240,7 +241,7 @@ const issueTempPassword = async (u: UserView) => {
             placeholder="Подразделения (row scope)" display="chip" filter />
         </div>
         <div v-if="evgaDepartments.length" class="field">
-          <label>Департамент ДВГА (ОБМ ЕВГА)</label>
+          <label>Департамент ДВГА (ОБМ ЭВГА)</label>
           <Select v-model="evgaDeptId" :options="evgaDepartments" option-label="title" option-value="id"
             placeholder="Не назначен" filter show-clear />
           <small class="hint">Определяет, записи какого департамента видит аудитор в реестре 5-15а.</small>

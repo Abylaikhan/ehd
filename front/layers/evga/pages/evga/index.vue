@@ -29,6 +29,37 @@ const fNoticeNum = ref('')
 const fConfirmedNoDecision = ref(false) // быстрый фильтр «Подтверждено без решения» (EVGA-FR-082)
 const fDepartment = ref<number | null>(null)
 
+// --- колоночный поиск (спека 019): отдельная строка под шапкой таблицы ---
+const cPpoPp = ref('')
+const cFio = ref('')
+const cLa1 = ref('')
+const cStatusNote = ref('')
+const cOutNum = ref('')
+// применяется с задержкой, чтобы не дёргать сервер на каждую букву
+let colTimer: ReturnType<typeof setTimeout> | undefined
+function applyColumnSearch() {
+  clearTimeout(colTimer)
+  colTimer = setTimeout(applyFilters, 400)
+}
+// PrimeVue рисует строку фильтров по этому объекту; сам поиск серверный (lazy),
+// поэтому значения держим в собственных ref-ах, а здесь только ключи колонок.
+const colFilters = ref<Record<string, { value: null }>>({
+  profile_title: { value: null }, gu: { value: null }, sendername: { value: null },
+  ppo_pp: { value: null }, paymentdate: { value: null }, iin: { value: null },
+  fio: { value: null }, la1: { value: null }, amount_part: { value: null },
+  status_title: { value: null }, status_note: { value: null },
+  notice_num: { value: null }, out_num: { value: null },
+})
+
+// Светофор контрольного срока: красный — истёк, жёлтый — истекает, зелёный — в сроке.
+// Для статусов без срока (решение принято) индикатор не показываем.
+function lightOf(r: EvgaRecord): { cls: string; title: string } | null {
+  if (r.deadline_state === 'expired') return { cls: 'lamp-red', title: 'Срок истёк' }
+  if (r.deadline_state === 'expiring') return { cls: 'lamp-amber', title: 'Срок истекает' }
+  if (r.exec_due) return { cls: 'lamp-green', title: 'В пределах срока' }
+  return null
+}
+
 const inNoticeOptions = [
   { label: 'Все записи', value: null },
   { label: 'Включено в уведомление', value: true },
@@ -62,6 +93,12 @@ function buildParams(): EvgaRegistryParams {
     notice_num: fNoticeNum.value.trim(),
     confirmed_no_decision: fConfirmedNoDecision.value ? true : null,
     department_id: fDepartment.value,
+    // колоночный поиск (спека 019)
+    ppo_pp: cPpoPp.value.trim(),
+    fio: cFio.value.trim(),
+    la1: cLa1.value.trim(),
+    status_note: cStatusNote.value.trim(),
+    out_num: cOutNum.value.trim(),
   }
 }
 function applyFilters() {
@@ -76,6 +113,7 @@ function resetFilters() {
   fInNotice.value = null
   fConfirmedNoDecision.value = false
   fDepartment.value = null
+  cPpoPp.value = cFio.value = cLa1.value = cStatusNote.value = cOutNum.value = ''
   applyFilters()
 }
 
@@ -214,7 +252,7 @@ const rowClass = (r: EvgaRecord) =>
 
 <template>
   <div>
-    <PageHeader title="ОБМ ЕВГА — Реестр рисков 5-15а" description="Витрина результатов онлайн-бюджетного мониторинга. Режим чтения.">
+    <PageHeader title="ОБМ ЭВГА — Реестр рисков 5-15а" description="Витрина результатов онлайн-бюджетного мониторинга. Режим чтения.">
       <template #actions>
         <Tag v-if="scopeLabel" :value="scopeLabel" severity="info" />
       </template>
@@ -222,8 +260,8 @@ const rowClass = (r: EvgaRecord) =>
 
     <Card>
       <template #content>
-        <ErrorState v-if="screenState === 'denied'" title="Доступ запрещён" message="У вас нет роли модуля ОБМ ЕВГА." />
-        <ErrorState v-else-if="screenState === 'source'" title="Источник недоступен" message="База данных ОБМ ЕВГА временно недоступна. Повторите позже." retryable @retry="refresh" />
+        <ErrorState v-if="screenState === 'denied'" title="Доступ запрещён" message="У вас нет роли модуля ОБМ ЭВГА." />
+        <ErrorState v-else-if="screenState === 'source'" title="Источник недоступен" message="База данных ОБМ ЭВГА временно недоступна. Повторите позже." retryable @retry="refresh" />
         <ErrorState v-else-if="screenState === 'error'" message="Не удалось загрузить реестр." retryable @retry="refresh" />
         <div v-else-if="screenState === 'loading'" class="center">
           <ProgressSpinner style="width: 2.5rem; height: 2.5rem" />
@@ -231,7 +269,7 @@ const rowClass = (r: EvgaRecord) =>
 
         <template v-else>
           <Message v-if="scope?.unmapped" severity="warn" :closable="false" class="scope-warn">
-            Пользователь не сопоставлен с департаментом ДВГА: ИИН не найден в системе ОБМ ЕВГА либо не подтверждён.
+            Пользователь не сопоставлен с департаментом ДВГА: ИИН не найден в системе ОБМ ЭВГА либо не подтверждён.
             Обратитесь к администратору.
           </Message>
 
@@ -296,9 +334,13 @@ const rowClass = (r: EvgaRecord) =>
             :sort-order="sort ? (sort.dir === 'asc' ? 1 : -1) : 0"
             removable-sort
             striped-rows
+            show-gridlines
             size="small"
             scrollable
-            class="data-table"
+            scroll-height="62vh"
+            filter-display="row"
+            :filters="colFilters"
+            class="data-table compact"
             :row-class="rowClass"
             @sort="onSort"
           >
@@ -306,31 +348,87 @@ const rowClass = (r: EvgaRecord) =>
               <div class="empty-row">По текущему запросу строк не найдено.</div>
             </template>
             <Column v-if="canWrite" selection-mode="multiple" :style="{ width: '2.5rem' }" />
-            <Column header="№" :style="{ width: '3.5rem' }">
+            <Column header="№" :style="{ width: '3.2rem' }">
               <template #body="{ index }">{{ first + index + 1 }}</template>
             </Column>
-            <Column field="profile_title" header="Профиль риска" :style="{ minWidth: '14rem' }" />
-            <Column field="gu" header="Код ГУ" />
-            <Column field="sendername" header="Отправитель" :style="{ minWidth: '16rem' }" />
-            <Column field="ppo_pp" header="№ платежа" />
+            <!-- светофор по контрольному сроку -->
+            <Column header="" :style="{ width: '2.2rem' }">
+              <template #body="{ data: r }">
+                <span v-if="lightOf(r)" class="lamp" :class="lightOf(r)!.cls" :title="lightOf(r)!.title" />
+                <span v-else class="lamp lamp-off" title="Срок не применяется" />
+              </template>
+            </Column>
+            <Column field="profile_title" header="Профиль риска" :style="{ minWidth: '12rem' }">
+              <template #filter>
+                <Select v-model="fProfile" :options="refOptions(refs?.profiles)" option-label="label" option-value="value"
+                  placeholder="все" show-clear filter size="small" class="col-f" @change="applyFilters" />
+              </template>
+            </Column>
+            <Column field="gu" header="Код ГУ">
+              <template #filter>
+                <InputText v-model="fGu" placeholder="поиск" size="small" class="col-f" @input="applyColumnSearch" />
+              </template>
+            </Column>
+            <Column field="sendername" header="Отправитель" :style="{ minWidth: '14rem' }">
+              <template #filter>
+                <InputText v-model="fSender" placeholder="поиск" size="small" class="col-f" @input="applyColumnSearch" />
+              </template>
+            </Column>
+            <Column field="ppo_pp" header="№ платежа">
+              <template #filter>
+                <InputText v-model="cPpoPp" placeholder="поиск" size="small" class="col-f" @input="applyColumnSearch" />
+              </template>
+            </Column>
             <Column field="paymentdate" header="Дата платежа" sortable>
               <template #body="{ data: r }">{{ fmtDate(r.paymentdate) }}</template>
+              <template #filter>
+                <DatePicker v-model="fDateFrom" placeholder="с" date-format="dd.mm.yy" size="small" class="col-f" @update:model-value="applyFilters" />
+              </template>
             </Column>
-            <Column field="iin" header="ИИН получателя" />
-            <Column header="ФИО получателя" :style="{ minWidth: '12rem' }">
+            <Column field="iin" header="ИИН получателя">
+              <template #filter>
+                <InputText v-model="fIin" placeholder="поиск" size="small" class="col-f" @input="applyColumnSearch" />
+              </template>
+            </Column>
+            <Column field="fio" header="ФИО получателя" :style="{ minWidth: '11rem' }">
               <template #body="{ data: r }">{{ fio(r) }}</template>
+              <template #filter>
+                <InputText v-model="cFio" placeholder="поиск" size="small" class="col-f" @input="applyColumnSearch" />
+              </template>
             </Column>
-            <Column field="la1" header="Карт-счёт" />
+            <Column field="la1" header="Карт-счёт">
+              <template #filter>
+                <InputText v-model="cLa1" placeholder="поиск" size="small" class="col-f" @input="applyColumnSearch" />
+              </template>
+            </Column>
             <Column field="amount_part" header="Сумма" sortable class="num">
               <template #body="{ data: r }">{{ fmtAmount(r.amount_part) }}</template>
+              <template #filter>
+                <InputNumber v-model="fAmountFrom" placeholder="от" size="small" class="col-f" @update:model-value="applyColumnSearch" />
+              </template>
             </Column>
-            <Column field="status_title" header="Статус" />
-            <Column field="status_note" header="Комментарий" :style="{ maxWidth: '14rem' }" />
-            <Column header="Уведомление">
+            <Column field="status_title" header="Статус">
+              <template #filter>
+                <Select v-model="fStatus" :options="refOptions(refs?.statuses)" option-label="label" option-value="value"
+                  placeholder="все" show-clear size="small" class="col-f" @change="applyFilters" />
+              </template>
+            </Column>
+            <Column field="status_note" header="Комментарий" :style="{ maxWidth: '12rem' }">
+              <template #filter>
+                <InputText v-model="cStatusNote" placeholder="поиск" size="small" class="col-f" @input="applyColumnSearch" />
+              </template>
+            </Column>
+            <Column field="notice_num" header="Уведомление">
               <template #body="{ data: r }">{{ r.notice_num || '—' }}</template>
+              <template #filter>
+                <InputText v-model="fNoticeNum" placeholder="поиск" size="small" class="col-f" @input="applyColumnSearch" />
+              </template>
             </Column>
-            <Column header="Исходящее">
+            <Column field="out_num" header="Исходящее">
               <template #body="{ data: r }">{{ r.out_num || '—' }}</template>
+              <template #filter>
+                <InputText v-model="cOutNum" placeholder="поиск" size="small" class="col-f" @input="applyColumnSearch" />
+              </template>
             </Column>
             <Column header="Срок" :style="{ minWidth: '9.5rem' }">
               <template #body="{ data: r }">
@@ -393,12 +491,16 @@ const rowClass = (r: EvgaRecord) =>
 <style scoped>
 .center { display: flex; justify-content: center; padding: 2.5rem 0; }
 .scope-warn { margin-bottom: 1rem; }
-.filters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
-.f-narrow { width: 6.5rem; }
-.f-year :deep(input) { width: 6.5rem; }
-.f-mid { width: 12rem; }
+/* Компактная панель фильтров: уменьшенные поля и кегль (запрос по UI). */
+.filters { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.75rem; font-size: 0.82rem; }
+.filters :deep(.p-inputtext),
+.filters :deep(.p-select-label),
+.filters :deep(.p-togglebutton) { font-size: 0.82rem; padding-top: 0.3rem; padding-bottom: 0.3rem; }
+.f-narrow { width: 5.5rem; }
+.f-year :deep(input) { width: 5.5rem; }
+.f-mid { width: 10rem; }
 .f-mid :deep(input) { width: 100%; }
-.f-wide { width: 18rem; }
+.f-wide { width: 15rem; }
 .f-actions { display: flex; gap: 0.4rem; align-items: center; }
 .toolbar { display: flex; align-items: center; margin-bottom: 0.75rem; }
 .count { font-size: 0.9rem; color: var(--ehd-ink-2); }
@@ -410,6 +512,22 @@ const rowClass = (r: EvgaRecord) =>
 .num { text-align: right; }
 .f-toggle { white-space: nowrap; }
 .due-cell { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+
+/* Компактная таблица: мельче кегль и плотнее ячейки (запрос по UI). */
+.compact :deep(.p-datatable-tbody > tr > td),
+.compact :deep(.p-datatable-thead > tr > th) { padding: 0.3rem 0.45rem; font-size: 0.8rem; }
+/* Шапка и строка фильтров закреплены при прокрутке длинного списка. */
+.compact :deep(.p-datatable-thead > tr > th) { position: sticky; z-index: 2; background: var(--p-datatable-header-cell-background); }
+.col-f { width: 100%; min-width: 5rem; }
+.col-f :deep(input) { width: 100%; font-size: 0.78rem; padding: 0.2rem 0.35rem; }
+.col-f :deep(.p-select-label) { font-size: 0.78rem; padding: 0.2rem 0.35rem; }
+
+/* Светофор контрольного срока */
+.lamp { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 50%; border: 1px solid rgb(0 0 0 / 12%); }
+.lamp-red { background: var(--p-red-500); }
+.lamp-amber { background: var(--p-amber-400); }
+.lamp-green { background: var(--p-green-500); }
+.lamp-off { background: var(--p-surface-300); }
 /* Подсветка строк по контрольному сроку (EVGA-FR-080). td-фон перекрывает striped-rows. */
 :deep(tr.row-expired > td) { background: var(--p-red-50); }
 :deep(tr.row-expiring > td) { background: var(--p-orange-50); }

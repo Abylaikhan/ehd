@@ -14,10 +14,10 @@ func SeedReference(db *gorm.DB) error {
 		{Code: "D01", NameRu: "Подразделение 01", NameKk: "Бөлімше 01", Status: "active"},
 		{Code: "D02", NameRu: "Подразделение 02", NameKk: "Бөлімше 02", Status: "active"},
 	}
-	// Роли модуля ОБМ ЕВГА (спека 007 FR-4): назначаются администратором.
+	// Роли модуля ОБМ ЭВГА (спека 007 FR-4): назначаются администратором.
 	roles := []RoleModel{
-		{Code: "evga_auditor", NameRu: "Аудитор ДВГА (ОБМ ЕВГА)", NameKk: "ІМАД аудиторы (ОБМ ЕВГА)", Status: "active"},
-		{Code: "evga_curator", NameRu: "Куратор КВГА (ОБМ ЕВГА)", NameKk: "ІМАК кураторы (ОБМ ЕВГА)", Status: "active"},
+		{Code: "evga_auditor", NameRu: "Аудитор ДВГА (ОБМ ЭВГА)", NameKk: "ІМАД аудиторы (ОБМ ЭВГА)", Status: "active"},
+		{Code: "evga_curator", NameRu: "Куратор КВГА (ОБМ ЭВГА)", NameKk: "ІМАК кураторы (ОБМ ЭВГА)", Status: "active"},
 	}
 	return db.Transaction(func(tx *gorm.DB) error {
 		for i := range regions {

@@ -332,7 +332,7 @@ export interface ColumnConfigPayload {
   null_label?: string
 }
 
-// --- Модуль ОБМ ЕВГА (backend-спека 007-evga-registry) ---
+// --- Модуль ОБМ ЭВГА (backend-спека 007-evga-registry) ---
 
 export interface EvgaScope {
   department_id: number | null
@@ -404,7 +404,7 @@ export interface EvgaReferences {
   departments?: EvgaReference[]
 }
 
-// --- ОБМ ЕВГА: статусы (backend-спека 008) ---
+// --- ОБМ ЭВГА: статусы (backend-спека 008) ---
 
 export interface EvgaHistoryEntry {
   id: number
@@ -436,7 +436,7 @@ export interface EvgaBulkReport {
   rejections: { id: number; reason: string }[]
 }
 
-// --- ОБМ ЕВГА: формирование уведомлений (backend-спека 009) ---
+// --- ОБМ ЭВГА: формирование уведомлений (backend-спека 009) ---
 
 export interface EvgaGroupRecord {
   id: number
@@ -524,7 +524,7 @@ export interface EvgaNoticeListResponse {
   scope: EvgaScope
 }
 
-// --- ОБМ ЕВГА: согласование (backend-спека 010) ---
+// --- ОБМ ЭВГА: согласование (backend-спека 010) ---
 
 export interface EvgaRouteStep {
   id: number

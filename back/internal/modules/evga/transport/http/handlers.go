@@ -13,7 +13,7 @@ import (
 	"ehd-api/pkg/httpserver"
 )
 
-// Handler — HTTP-обработчики модуля ЕВГА.
+// Handler — HTTP-обработчики модуля ЭВГА.
 type Handler struct {
 	svc      *application.Service
 	status   *application.StatusService
@@ -41,7 +41,7 @@ func mapErr(err error) error {
 	case errors.Is(err, domain.ErrNotFound):
 		return httpserver.NewError(fiber.StatusNotFound, "NOT_FOUND", "Запись не найдена")
 	case errors.Is(err, domain.ErrSourceUnavailable):
-		return httpserver.NewError(fiber.StatusServiceUnavailable, "EVGA_SOURCE_UNAVAILABLE", "Источник данных ОБМ ЕВГА недоступен")
+		return httpserver.NewError(fiber.StatusServiceUnavailable, "EVGA_SOURCE_UNAVAILABLE", "Источник данных ОБМ ЭВГА недоступен")
 	case errors.Is(err, domain.ErrNoticeNotEditable):
 		return httpserver.NewError(fiber.StatusUnprocessableEntity, "NOTICE_NOT_EDITABLE",
 			"Операция доступна только для уведомления в статусе «Проект создан»")
@@ -51,7 +51,7 @@ func mapErr(err error) error {
 	case errors.Is(err, domain.ErrNoOwnerDepartment):
 		return httpserver.NewError(fiber.StatusForbidden, "ACCESS_DENIED", err.Error())
 	case errors.Is(err, application.ErrReadOnlyMode):
-		return httpserver.NewError(fiber.StatusForbidden, "EVGA_READ_ONLY", "Модуль ОБМ ЕВГА работает в режиме чтения")
+		return httpserver.NewError(fiber.StatusForbidden, "EVGA_READ_ONLY", "Модуль ОБМ ЭВГА работает в режиме чтения")
 	case errors.Is(err, application.ErrCuratorReadOnly):
 		return httpserver.NewError(fiber.StatusForbidden, "ACCESS_DENIED", "Роль не допускает изменения записей")
 	case errors.As(err, &te):

@@ -181,7 +181,7 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
 
     <ErrorState v-if="screenState === 'denied'" title="Доступ запрещён" message="У вас нет прав на просмотр этого уведомления." />
     <ErrorState v-else-if="screenState === 'notfound'" title="Не найдено" message="Уведомление не существует или относится к другому департаменту." />
-    <ErrorState v-else-if="screenState === 'source'" title="Источник недоступен" message="База данных ОБМ ЕВГА временно недоступна." retryable @retry="refresh" />
+    <ErrorState v-else-if="screenState === 'source'" title="Источник недоступен" message="База данных ОБМ ЭВГА временно недоступна." retryable @retry="refresh" />
     <ErrorState v-else-if="screenState === 'error'" message="Не удалось загрузить уведомление." retryable @retry="refresh" />
     <div v-else-if="screenState === 'loading'" class="center"><ProgressSpinner style="width: 2.5rem; height: 2.5rem" /></div>
 
@@ -304,7 +304,7 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
             <Card>
               <template #title>Приложение — записи витрины ({{ card.rows.length }})</template>
               <template #content>
-                <DataTable :value="card.rows" size="small" striped-rows scrollable class="data-table">
+                <DataTable show-gridlines :value="card.rows" size="small" striped-rows scrollable class="data-table">
                   <Column header="№" :style="{ width: '3.5rem' }">
                     <template #body="{ index }">{{ index + 1 }}</template>
                   </Column>

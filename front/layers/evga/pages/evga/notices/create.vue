@@ -106,7 +106,7 @@ const fmtAmount = (v: string) => {
               — ГУ {{ c.gu }}, записей: {{ c.records }}
             </li>
           </ul>
-          <DataTable v-if="result.rejected.length" :value="result.rejected" size="small" striped-rows class="mt">
+          <DataTable show-gridlines v-if="result.rejected.length" :value="result.rejected" size="small" striped-rows class="mt">
             <Column field="id" header="Запись" :style="{ width: '8rem' }" />
             <Column field="reason" header="Причина" />
           </DataTable>
@@ -123,7 +123,7 @@ const fmtAmount = (v: string) => {
           <div v-if="pending" class="center"><ProgressSpinner style="width: 2.5rem; height: 2.5rem" /></div>
           <ErrorState v-else-if="error" message="Не удалось загрузить группировку." retryable @retry="refresh" />
           <template v-else>
-            <DataTable :value="groups" size="small" striped-rows class="data-table">
+            <DataTable show-gridlines :value="groups" size="small" striped-rows class="data-table">
               <template #empty>
                 <div class="empty-row">Ни одна из выбранных записей не может войти в уведомление.</div>
               </template>
@@ -164,7 +164,7 @@ const fmtAmount = (v: string) => {
             <Message v-if="rejected.length" severity="warn" :closable="false" class="mt">
               Не попали в формирование ({{ rejected.length }}):
             </Message>
-            <DataTable v-if="rejected.length" :value="rejected" size="small" striped-rows class="mt-sm">
+            <DataTable show-gridlines v-if="rejected.length" :value="rejected" size="small" striped-rows class="mt-sm">
               <Column field="id" header="Запись" :style="{ width: '8rem' }" />
               <Column field="reason" header="Причина" />
             </DataTable>
