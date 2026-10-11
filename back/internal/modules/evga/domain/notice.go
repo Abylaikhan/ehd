@@ -80,6 +80,18 @@ type CliOrg struct {
 	Title  string
 }
 
+// NoticeFilter — фильтры списка уведомлений: колоночный поиск (спека 019 FR-1).
+// Пустые значения не применяются; строковые — подстрока, регистронезависимо.
+type NoticeFilter struct {
+	DepartmentID *int64 // только при scope «все департаменты»
+	StatusID     *int64
+	Docnum       string
+	GU           string
+	SenderName   string
+	Recipient    string
+	StatusTitle  string
+}
+
 // NoticeListItem — строка списка уведомлений (FR-7).
 type NoticeListItem struct {
 	ID          int64

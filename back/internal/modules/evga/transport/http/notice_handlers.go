@@ -163,7 +163,17 @@ func (h *Handler) noticeList(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	items, total, scope, err := h.notices.List(c.UserContext(), identityFrom(c), filterDept, statusID, c.Query("docnum"), page)
+	// колоночный поиск списка уведомлений (спека 019 FR-1)
+	f := domain.NoticeFilter{
+		DepartmentID: filterDept,
+		StatusID:     statusID,
+		Docnum:       c.Query("docnum"),
+		GU:           c.Query("gu"),
+		SenderName:   c.Query("sendername"),
+		Recipient:    c.Query("recipient"),
+		StatusTitle:  c.Query("status_title"),
+	}
+	items, total, scope, err := h.notices.List(c.UserContext(), identityFrom(c), f, page)
 	if err != nil {
 		return mapErr(err)
 	}

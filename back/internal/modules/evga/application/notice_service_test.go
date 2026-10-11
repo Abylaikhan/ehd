@@ -40,7 +40,7 @@ func (f *fakeNoticeRepo) CreateNotices(_ context.Context, groups []domain.Create
 	}
 	return f.created, nil, nil
 }
-func (f *fakeNoticeRepo) ListNotices(_ context.Context, deptID, _, _ *int64, _ string, _ domain.Page) ([]domain.NoticeListItem, int64, error) {
+func (f *fakeNoticeRepo) ListNotices(_ context.Context, deptID *int64, _ domain.NoticeFilter, _ domain.Page) ([]domain.NoticeListItem, int64, error) {
 	f.lastDept = deptID
 	return []domain.NoticeListItem{}, 0, nil
 }
@@ -62,7 +62,7 @@ func newNoticeSvc(repo *fakeNoticeRepo, scopes *fakeScopes, write bool) *NoticeS
 
 func TestNoticeCreateRBAC(t *testing.T) {
 	ctx := context.Background()
-	groups := []domain.CreateGroupInput{{RecordIDs: []int64{1, 2}, CliID: 9}}
+	groups := []domain.CreateGroupInput{{RecordIDs: []int64{1, 2}, CliIDs: []int64{9}}}
 
 	// read-only режим
 	svc := newNoticeSvc(&fakeNoticeRepo{}, &fakeScopes{scope: dept(7)}, false)
@@ -135,7 +135,7 @@ func TestNoticeListScope(t *testing.T) {
 	ctx := context.Background()
 	repo := &fakeNoticeRepo{}
 	svc := newNoticeSvc(repo, &fakeScopes{scope: dept(9), iin: "880101300123"}, true)
-	_, _, scope, err := svc.List(ctx, auditor("u1"), nil, nil, "", domain.Page{})
+	_, _, scope, err := svc.List(ctx, auditor("u1"), domain.NoticeFilter{}, domain.Page{})
 	if err != nil || scope.Unmapped {
 		t.Fatalf("list: %v %+v", err, scope)
 	}
@@ -144,7 +144,7 @@ func TestNoticeListScope(t *testing.T) {
 	}
 	// unmapped аудитор — пусто без похода в репо
 	svc = newNoticeSvc(&fakeNoticeRepo{}, &fakeScopes{scope: domain.DepartmentScope{Unmapped: true}}, true)
-	items, total, scope, err := svc.List(ctx, auditor("u2"), nil, nil, "", domain.Page{})
+	items, total, scope, err := svc.List(ctx, auditor("u2"), domain.NoticeFilter{}, domain.Page{})
 	if err != nil || !scope.Unmapped || len(items) != 0 || total != 0 {
 		t.Fatalf("unmapped list: %v %v %+v", items, total, scope)
 	}
