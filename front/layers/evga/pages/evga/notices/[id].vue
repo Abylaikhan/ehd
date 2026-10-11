@@ -63,6 +63,33 @@ async function saveComment() {
   }
 }
 
+// предпросмотр документа в модальном окне (PDF во встроенном просмотрщике браузера)
+const previewOpen = ref(false)
+const previewUrl = ref('')
+const previewBusy = ref(false)
+
+async function openPreview() {
+  previewBusy.value = true
+  actionError.value = ''
+  try {
+    previewUrl.value = await evga.noticePDFUrl(id.value)
+    previewOpen.value = true
+  } catch (e) {
+    actionError.value = apiErrorMessage(e)
+  } finally {
+    previewBusy.value = false
+  }
+}
+
+// освобождаем blob-URL, иначе документ висит в памяти вкладки
+function closePreview() {
+  if (previewUrl.value) {
+    URL.revokeObjectURL(previewUrl.value)
+    previewUrl.value = ''
+  }
+}
+onBeforeUnmount(closePreview)
+
 const pdfBusy = ref(false)
 async function downloadPDF() {
   pdfBusy.value = true
@@ -130,6 +157,7 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
       :description="header ? `${header.status_title || '—'} · ГУ ${header.gu} · ${header.sendername}` : undefined"
     >
       <template #actions>
+        <Button label="Предпросмотр" icon="pi pi-eye" outlined :loading="previewBusy" @click="openPreview" />
         <Button label="Скачать PDF" icon="pi pi-file-pdf" outlined :loading="pdfBusy" @click="downloadPDF" />
         <Button
           v-if="canWrite && outData?.exists"
@@ -255,7 +283,10 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
                   PDF формируется по утверждённому образцу (казахская и русская части). ЭЦП подписанта
                   проставляется при регистрации канцелярией.
                 </p>
-                <Button label="Скачать одним файлом" icon="pi pi-download" outlined :loading="pdfBusy" @click="downloadPDF" />
+                <div class="preview-actions">
+                  <Button label="Открыть предпросмотр" icon="pi pi-eye" :loading="previewBusy" @click="openPreview" />
+                  <Button label="Скачать одним файлом" icon="pi pi-download" outlined :loading="pdfBusy" @click="downloadPDF" />
+                </div>
               </template>
             </Card>
           </TabPanel>
@@ -304,6 +335,23 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
           <Button label="Удалить" icon="pi pi-trash" severity="danger" :loading="deleting" @click="doDelete" />
         </template>
       </Dialog>
+
+      <!-- предпросмотр документа: PDF во встроенном просмотрщике браузера -->
+      <Dialog
+        v-model:visible="previewOpen"
+        modal
+        maximizable
+        :header="`Предпросмотр — уведомление ${header?.docnum || '(проект)'}`"
+        :style="{ width: '92vw', maxWidth: '1400px' }"
+        :content-style="{ padding: '0' }"
+        @hide="closePreview"
+      >
+        <iframe v-if="previewUrl" :src="previewUrl" class="pdf-frame" title="Предпросмотр уведомления" />
+        <template #footer>
+          <Button label="Скачать PDF" icon="pi pi-download" outlined :loading="pdfBusy" @click="downloadPDF" />
+          <Button label="Закрыть" text severity="secondary" @click="previewOpen = false" />
+        </template>
+      </Dialog>
     </template>
   </div>
 </template>
@@ -325,4 +373,6 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
 .data-table { border: 1px solid var(--ehd-border); border-radius: var(--ehd-radius-sm); overflow: hidden; }
 .num { text-align: right; }
 .confirm-text { margin: 0; color: var(--ehd-ink-2); }
+.preview-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.pdf-frame { width: 100%; height: 78vh; border: 0; display: block; }
 </style>

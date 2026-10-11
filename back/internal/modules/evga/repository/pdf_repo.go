@@ -20,6 +20,7 @@ func (rp *RegistryRepo) PDFData(ctx context.Context, noticeID int64, deptID *int
 		RecipKZ     string
 		RecipCode   string
 		DeptTitle   string
+		DeptCode    string
 		SignerName  string
 		SignerPos   string
 		SignerPosKZ string
@@ -32,6 +33,7 @@ func (rp *RegistryRepo) PDFData(ctx context.Context, noticeID int64, deptID *int
 			coalesce(cli.title,'') as recip_ru, coalesce(cli.title_kk, cli.title, '') as recip_kz,
 			coalesce(cli.code,'') as recip_code,
 			coalesce(d.title,'') as dept_title,
+			coalesce(nullif(trim(d.code),''), reg.region_code, '') as dept_code,
 			coalesce(su.short_name, su.login, '') as signer_name,
 			coalesce(sp.title,'') as signer_pos, coalesce(sp.title_kk, sp.title, '') as signer_pos_kz,
 			coalesce(cu.short_name, cu.login, '') as exec_name,
@@ -41,6 +43,8 @@ func (rp *RegistryRepo) PDFData(ctx context.Context, noticeID int64, deptID *int
 		Joins(`left join its_risk_notice_recepient rc on rc.its_risk_notice_id = n.id and rc."in$trash" is null`).
 		Joins("left join its_cli cli on cli.id = rc.its_cli_id").
 		Joins("left join its_departments d on d.id = n.its_departments_id").
+		// код ДВГА: собственный код департамента, при его отсутствии — код региона
+		Joins(`left join its_regions reg on reg.id = d.its_regions_id and reg."in$trash" is null`).
 		Joins("left join users su on su.id = n.signer_id").
 		Joins("left join hr_position sp on sp.id = su.hr_position_id").
 		Joins("left join users cu on cu.id = n.created_by").
@@ -91,6 +95,7 @@ func (rp *RegistryRepo) PDFData(ctx context.Context, noticeID int64, deptID *int
 		RecipientRU: strings.TrimSpace(h.RecipRU), RecipientKZ: strings.TrimSpace(h.RecipKZ),
 		RecipientCode:  strings.TrimSpace(h.RecipCode),
 		DeptTitle:      h.DeptTitle,
+		DeptCode:       strings.TrimSpace(h.DeptCode),
 		SignerPosition: h.SignerPos, SignerPosKZ: h.SignerPosKZ, SignerName: h.SignerName,
 		ExecName: h.ExecName, ExecPhone: h.ExecPhone, ExecEmail: h.ExecEmail,
 	}
