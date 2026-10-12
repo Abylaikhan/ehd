@@ -57,15 +57,27 @@ func (ar *ApprovalRepo) IssueNumber(ctx context.Context, meta NoticeMeta, now ti
 	var num string
 	err := ar.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// блокировка счётчика департамента (EVGA-BR-021, AT-10)
+		// Год последнего номера берём из самого docnum, а не из its_departments.notice_num_year:
+		// в боевой БД такой колонки НЕТ (спека 021). Номер читается в этой же транзакции,
+		// поэтому годовой сброс остаётся атомарным и не требует второго хранилища.
 		var dep []struct {
-			NoticeNum     *int64
-			NoticeNumYear *int32
-			RegionCode    *string
+			NoticeNum  *int64
+			LastDocnum *string
+			RegionCode *string
 		}
 		err := tx.Raw(
-			`select d.notice_num, d.notice_num_year, r.region_code
+			`select d.notice_num, r.region_code, last.docnum as last_docnum
 			   from its_departments d
 			   left join its_regions r on r.id = d.its_regions_id
+			   left join lateral (
+			        select rq.docnum
+			          from its_risk_notice n
+			          join its_req rq on rq.id = n.req_id
+			         where n.its_departments_id = d.id
+			           and coalesce(rq.docnum,'') <> ''
+			         order by rq.id desc
+			         limit 1
+			   ) last on true
 			  where d.id = ?
 			  for update of d`, *meta.DepartmentID,
 		).Scan(&dep).Error
@@ -83,14 +95,18 @@ func (ar *ApprovalRepo) IssueNumber(ctx context.Context, meta NoticeMeta, now ti
 		if dep[0].NoticeNum != nil {
 			counter = *dep[0].NoticeNum
 		}
-		seq := domain.NextNoticeSeq(counter, dep[0].NoticeNumYear, now.Year())
+		lastYear := (*int32)(nil)
+		if dep[0].LastDocnum != nil {
+			lastYear = domain.YearFromNoticeNumber(*dep[0].LastDocnum)
+		}
+		seq := domain.NextNoticeSeq(counter, lastYear, now.Year())
 		formatted, err := domain.FormatNoticeNumber(region, now.Year(), seq)
 		if err != nil {
 			return err
 		}
 		if err := tx.Exec(
-			`update its_departments set notice_num = ?, notice_num_year = ? where id = ?`,
-			seq, now.Year(), *meta.DepartmentID,
+			`update its_departments set notice_num = ? where id = ?`,
+			seq, *meta.DepartmentID,
 		).Error; err != nil {
 			return err
 		}
