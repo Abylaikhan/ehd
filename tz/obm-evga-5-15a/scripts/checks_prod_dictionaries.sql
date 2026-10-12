@@ -1,5 +1,5 @@
 -- Проверка боевой obm_evga: справочники для автоадресатов (замечание 3) и аудит схемы.
--- Выполнено 13.10.2026, результаты — в voprosy-analitiku-6.md.
+-- Выполнено 13.10.2026, результаты — в voprosy-analitiku-7-itogovyy.md.
 --
 -- ТОЛЬКО SELECT. Запускать с принудительным read-only, не полагаясь на сервер:
 --   на боевой БД default_transaction_read_only = OFF.
@@ -125,3 +125,85 @@ select width_bucket(top_raz::numeric / vsego, 0, 1.0001, 5) as kvintil_doli_top_
 select extname from pg_extension order by 1;
 -- Факт: dblink, pgcrypto, plpgsql, uuid-ossp. pg_trgm и fuzzystrmatch НЕ установлены —
 -- нечёткое сопоставление названий придётся делать в коде ЕХД.
+
+-- ====================================================================
+-- Запросы 10-14 добавлены 13.10.2026: ответы на вопросы аналитика из данных.
+-- Результаты — в voprosy-analitiku-7-itogovyy.md.
+-- ====================================================================
+
+\echo ==== 10. ВОПРОС «код ДВГА»: заполненность кода департамента ====
+select count(*) as vsego,
+       count(*) filter (where coalesce(trim(code),'') <> '') as s_code,
+       count(*) filter (where coalesce(trim(bin),'')  <> '') as s_bin
+  from its_departments where "in$trash" is null;
+select id, left(title,45) as title, coalesce(code,'(пусто)') as code
+  from its_departments where "in$trash" is null order by id;
+-- Факт: 22 департамента, код у 18. Формат — 5-значный бюджетный (30301, 35801).
+-- Без кода: Абайская, Жетісу, Павлодарская, Улытау. Региональный код НЕ является
+-- кодом ДВГА — подстановка отменена спекой 023.
+
+\echo ==== 11. ВОПРОС «выбор существующего исходящего»: переиспользуется ли its_out ====
+select uvedomleniy_na_odno_ishodyashchee, count(*) as skolko_ishodyashchih
+  from (select o.id, count(n.id) as uvedomleniy_na_odno_ishodyashchee
+          from its_out o
+          join its_risk_notice n on n.its_out_id = o.id and n."in$trash" is null
+         where o."in$trash" is null group by o.id) z
+ group by 1 order by 1;
+-- Факт: 26942 исходящих, ВСЕ 1:1 с уведомлением. Переиспользования нет ни разу —
+-- функция «выбрать существующее письмо» не нужна.
+
+\echo ==== 12. ВОПРОС «повторяющийся риск»: ключ ГУ+получатель+профиль по периодам ====
+with k as (
+  select gu, iin, its_risk_profile_id,
+         count(distinct (god, mes)) as periodov,
+         count(distinct its_risk_status_id) as raznyh_statusov,
+         count(*) filter (where its_risk_status_id is not null and its_risk_status_id <> 1) as resheno
+    from its_tb_5_15a
+   where "in$trash" is null and coalesce(gu,'') <> '' and coalesce(iin,'') <> ''
+     and its_risk_profile_id is not null
+   group by 1,2,3
+)
+select count(*) as klyuchey_vsego,
+       count(*) filter (where periodov > 1) as v_neskolkih_periodah,
+       count(*) filter (where periodov > 1 and resheno >= 2) as est_2_resheniya,
+       count(*) filter (where periodov > 1 and resheno >= 2 and raznyh_statusov = 1) as status_odinakovyy,
+       count(*) filter (where periodov > 1 and resheno >= 2 and raznyh_statusov > 1)  as status_raznyy
+  from k;
+-- Факт: 1363625 / 649874 / 160375 / 56611 (35%) / 103764 (65%).
+-- В 65% случаев аудиторы ставили РАЗНЫЕ статусы одному и тому же риску в разных
+-- периодах → автоматический перенос статуса противоречит практике (замечание 5).
+
+\echo ==== 13. ВОПРОС «адресаты»: адресат упомянут в названии самого ГУ? ====
+-- Сравнение по префиксам слов (5 симв.), чтобы падежи не мешали.
+with chosen as (
+  select max(t.sendername) as gu_name, c.title as cli_title, count(*) as raz
+    from its_risk_notice n
+    join its_risk_notice_5_15a sn on sn.its_risk_notice_id = n.id and sn."in$trash" is null
+    join its_tb_5_15a t on t.id = sn.tb_5_15a_id
+    join its_risk_notice_recepient r on r.its_risk_notice_id = n.id and r."in$trash" is null
+    join its_cli c on c.id = r.its_cli_id
+   where n."in$trash" is null and coalesce(t.sendername,'') <> '' and coalesce(c.title,'') <> ''
+   group by t.gu_bin, c.title
+), w as (
+  select raz,
+    (select array_agg(distinct left(x,5)) from unnest(regexp_split_to_array(
+        regexp_replace(lower(translate(gu_name,'«»"''','    ')),'[^a-zа-яәғқңөұүһі0-9]+',' ','g'),' ')) x
+      where length(x)>=5 and x not in ('государственное','учреждение','коммунальное','коммуналдык','мемлекеттик','мекемеси')) as gu_w,
+    (select array_agg(distinct left(x,5)) from unnest(regexp_split_to_array(
+        regexp_replace(lower(translate(regexp_replace(cli_title,'\s+-\s+\d{4,}\s*$','','g'),'«»"''','    ')),'[^a-zа-яәғқңөұүһі0-9]+',' ','g'),' ')) x
+      where length(x)>=5 and x not in ('государственное','учреждение','коммунальное','коммуналдык','мемлекеттик','мекемеси')) as cli_w
+   from chosen
+), f as (
+  select raz, coalesce(array_length(cli_w,1),0) as cli_n,
+         (select count(*) from unnest(cli_w) x where x = any(gu_w)) as sovpalo
+    from w where cli_w is not null and gu_w is not null
+)
+select sum(raz) as sluchaev,
+       round(100.0*sum(raz) filter (where sovpalo = cli_n)/sum(raz),1) as proc_polnostyu,
+       round(100.0*sum(raz) filter (where cli_n>0 and sovpalo::numeric/cli_n >= 0.7)/sum(raz),1) as proc_v_osnovnom,
+       round(100.0*sum(raz) filter (where sovpalo = 0)/sum(raz),1) as proc_ne_svyazan
+  from f;
+-- Факт: 1799437 случаев. Адресат полностью упомянут в названии ГУ — 55.2%,
+-- в основном (>=70% слов) — 63.7%, никак не связан — 21.1%.
+-- Это ЛУЧШЕ справочника подчинённости (40.6%). Вместе оба правила дают 66.7%.
+-- Вывод: подсказка «2 случая из 3», полный автомат неприемлем.
