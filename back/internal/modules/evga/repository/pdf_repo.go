@@ -34,9 +34,9 @@ func (rp *RegistryRepo) PDFData(ctx context.Context, noticeID int64, deptID *int
 			coalesce(cli.code,'') as recip_code,
 			coalesce(d.title,'') as dept_title,
 			coalesce(nullif(trim(d.code),''), reg.region_code, '') as dept_code,
-			coalesce(su.short_name, su.login, '') as signer_name,
+			`+fioExpr("su", "simp")+` as signer_name,
 			coalesce(sp.title,'') as signer_pos, coalesce(sp.title_kk, sp.title, '') as signer_pos_kz,
-			coalesce(cu.short_name, cu.login, '') as exec_name,
+			`+fioExpr("cu", "cimp")+` as exec_name,
 			coalesce(cu.office_tel_number,'') as exec_phone, coalesce(cu.email,'') as exec_email`).
 		Joins("left join its_req rq on rq.id = n.req_id").
 		Joins(`left join its_out o on o.id = n.its_out_id and o."in$trash" is null`).
@@ -46,8 +46,12 @@ func (rp *RegistryRepo) PDFData(ctx context.Context, noticeID int64, deptID *int
 		// код ДВГА: собственный код департамента, при его отсутствии — код региона
 		Joins(`left join its_regions reg on reg.id = d.its_regions_id and reg."in$trash" is null`).
 		Joins("left join users su on su.id = n.signer_id").
+		// ФИО подписанта и исполнителя — из users_import (спека 022 FR-1): в боевой БД
+		// short_name пуст, и в официальный документ попадал бы логин
+		Joins(fioJoin("su", "simp")).
 		Joins("left join hr_position sp on sp.id = su.hr_position_id").
 		Joins("left join users cu on cu.id = n.created_by").
+		Joins(fioJoin("cu", "cimp")).
 		Where(`n.id = ? and n."in$trash" is null`, noticeID)
 	if deptID != nil {
 		q = q.Where("n.its_departments_id = ?", *deptID)

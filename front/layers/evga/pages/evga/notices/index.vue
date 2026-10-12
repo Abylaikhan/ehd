@@ -11,6 +11,7 @@ const fDocnum = ref('')
 // --- колоночный поиск (спека 019 FR-1/FR-2) ---
 const cGu = ref('')
 const cSender = ref('')
+const cDept = ref('')
 const cRecipient = ref('')
 const cStatus = ref('')
 const applied = ref<Record<string, string>>({})
@@ -20,6 +21,7 @@ function buildFilter() {
     docnum: fDocnum.value.trim(),
     gu: cGu.value.trim(),
     sendername: cSender.value.trim(),
+    department: cDept.value.trim(),
     recipient: cRecipient.value.trim(),
     status_title: cStatus.value.trim(),
   }
@@ -63,7 +65,7 @@ const first = computed(() => (page.value - 1) * pageSize.value)
 // значения держим в собственных ref-ах.
 const colFilters = ref<Record<string, { value: null }>>({
   docnum: { value: null }, status_title: { value: null }, gu: { value: null },
-  sendername: { value: null }, recipient: { value: null },
+  sendername: { value: null }, department: { value: null }, recipient: { value: null },
 })
 
 function onPage(e: { page: number; rows: number }) {
@@ -137,9 +139,17 @@ const fmtTS = (v: string | null) => (v ? new Date(v).toLocaleString('ru-RU') : '
                 <InputText v-model="cGu" placeholder="поиск" size="small" class="col-f" @input="applyColumnSearch" />
               </template>
             </Column>
-            <Column field="sendername" header="Отправитель" :style="{ minWidth: '13rem' }">
+            <!-- ГУ-плательщик по платежу: это НЕ отправитель уведомления (спека 022 FR-3) -->
+            <Column field="sendername" header="Наименование ГУ" :style="{ minWidth: '13rem' }">
               <template #filter>
                 <InputText v-model="cSender" placeholder="поиск" size="small" class="col-f" @input="applyColumnSearch" />
+              </template>
+            </Column>
+            <!-- Отправитель уведомления — департамент ДВГА (спека 022 FR-3) -->
+            <Column field="department" header="Отправитель" :style="{ minWidth: '13rem' }">
+              <template #body="{ data: n }">{{ n.department || '—' }}</template>
+              <template #filter>
+                <InputText v-model="cDept" placeholder="поиск" size="small" class="col-f" @input="applyColumnSearch" />
               </template>
             </Column>
             <Column field="recipient" header="Адресат" :style="{ minWidth: '14rem' }">
@@ -154,7 +164,6 @@ const fmtTS = (v: string | null) => (v ? new Date(v).toLocaleString('ru-RU') : '
             <Column header="Создано">
               <template #body="{ data: n }">{{ fmtTS(n.created_at) }}</template>
             </Column>
-            <Column v-if="scope?.all_departments" field="department" header="Департамент" :style="{ minWidth: '12rem' }" />
             <Column :style="{ width: '3rem' }">
               <template #body="{ data: n }">
                 <NuxtLink :to="`/evga/notices/${n.id}`" aria-label="Карточка уведомления">

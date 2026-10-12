@@ -90,6 +90,7 @@ type NoticeFilter struct {
 	SenderName   string
 	Recipient    string
 	StatusTitle  string
+	Department   string // «Отправитель» списка = наименование департамента ДВГА (спека 022 FR-3)
 }
 
 // NoticeListItem — строка списка уведомлений (FR-7).

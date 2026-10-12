@@ -176,11 +176,12 @@ func (sr *StatusRepo) History(ctx context.Context, recordID int64) ([]HistoryEnt
 			l.status_to_id, coalesce(st.title,'') as status_to_title,
 			coalesce(l.note,'') as note, l.amount_for_vozvrat::text as amount_for_vozvrat,
 			l.refund::text as refund,
-			coalesce(u.short_name, u.login, '') as changed_by_name,
+			`+fioExpr("u", "imp")+` as changed_by_name,
 			l.changed_at, coalesce(l.change_source,'') as change_source`).
 		Joins("left join its_risk_status sf on sf.id = l.status_from_id").
 		Joins("left join its_risk_status st on st.id = l.status_to_id").
 		Joins("left join users u on u.id = l.changed_by").
+		Joins(fioJoin("u", "imp")). // ФИО автора перехода из users_import (спека 022 FR-1)
 		Where("l.tb_5_15a_id = ?", recordID).
 		Order("l.id desc").
 		Scan(&rows).Error

@@ -12,7 +12,7 @@ import (
 // NoticeMetaModel — реквизиты уведомления, которых нет в obm_evga (спека 018 FR-2).
 // Хранится в БД ЕХД: внешняя БД в боевой среде read-only, добавлять туда колонки нельзя.
 type NoticeMetaModel struct {
-	NoticeID  int64 `gorm:"primaryKey"` // its_risk_notice.id (obm_evga)
+	NoticeID  int64  `gorm:"primaryKey"` // its_risk_notice.id (obm_evga)
 	Comment   string `gorm:"type:text"`
 	CreatedAt time.Time
 	UpdatedAt time.Time

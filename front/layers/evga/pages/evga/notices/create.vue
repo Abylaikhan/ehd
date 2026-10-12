@@ -49,6 +49,18 @@ async function searchCli(e: { query: string }) {
   }
 }
 
+// Порядок адресатов задаётся вручную (спека 022 FR-2): он уходит в
+// its_risk_notice_recepient.nn = 1..N и определяет последовательность получателей
+// в уведомлении, в колонке «Адресат» списка и в PDF.
+function moveCli(gu: string, i: number, delta: number) {
+  const list = groupState.value[gu]?.cli
+  if (!list) return
+  const j = i + delta
+  if (j < 0 || j >= list.length) return
+  const [item] = list.splice(i, 1)
+  if (item) list.splice(j, 0, item)
+}
+
 const creating = ref(false)
 const actionError = ref('')
 const result = ref<EvgaNoticeCreateResult | null>(null)
@@ -80,7 +92,7 @@ const fmtAmount = (v: string) => {
 
 <template>
   <div>
-    <PageHeader title="Формирование уведомлений" description="Записи сгруппированы по коду ГУ. Каждая группа — отдельное уведомление; выберите одного или нескольких адресатов из справочника ЕСЭДО.">
+    <PageHeader title="Формирование уведомлений" description="Записи сгруппированы по коду ГУ. Каждая группа — отдельное уведомление; выберите одного или нескольких адресатов из справочника ЕСЭДО. Порядок адресатов можно изменить стрелками — он сохраняется в уведомлении.">
       <template #actions>
         <NuxtLink to="/evga"><Button label="К реестру" icon="pi pi-arrow-left" text /></NuxtLink>
       </template>
@@ -133,7 +145,7 @@ const fmtAmount = (v: string) => {
               <Column header="Общая сумма" class="num" :style="{ width: '10rem' }">
                 <template #body="{ data: g }">{{ fmtAmount(g.total_sum) }}</template>
               </Column>
-              <Column header="Адресаты (ЕСЭДО)" :style="{ minWidth: '22rem' }">
+              <Column header="Адресаты (ЕСЭДО)" :style="{ minWidth: '24rem' }">
                 <template #body="{ data: g }">
                   <AutoComplete
                     v-model="groupState[g.gu]!.cli"
@@ -146,6 +158,20 @@ const fmtAmount = (v: string) => {
                     fluid
                     @complete="searchCli"
                   />
+                  <!-- порядок получателей задаётся вручную (спека 022 FR-2) -->
+                  <ol v-if="(groupState[g.gu]?.cli.length ?? 0) > 1 && !groupState[g.gu]?.excluded" class="addressees">
+                    <li v-for="(c, i) in groupState[g.gu]!.cli" :key="c.id">
+                      <span class="addr-title">{{ c.title }}</span>
+                      <Button
+                        icon="pi pi-arrow-up" text rounded size="small" aria-label="Переместить выше"
+                        :disabled="i === 0" @click="moveCli(g.gu, i, -1)"
+                      />
+                      <Button
+                        icon="pi pi-arrow-down" text rounded size="small" aria-label="Переместить ниже"
+                        :disabled="i === groupState[g.gu]!.cli.length - 1" @click="moveCli(g.gu, i, 1)"
+                      />
+                    </li>
+                  </ol>
                 </template>
               </Column>
               <Column :style="{ width: '9rem' }">
@@ -195,4 +221,9 @@ const fmtAmount = (v: string) => {
 .hint { font-size: 0.85rem; color: var(--p-text-muted-color); }
 .report-line { margin: 0 0 0.75rem; font-size: 0.95rem; }
 .created-list { margin: 0; padding-left: 1.2rem; }
+
+/* Нумерованный порядок адресатов с перемещением (спека 022 FR-2) */
+.addressees { margin: 0.4rem 0 0; padding-left: 1.4rem; font-size: 0.8rem; }
+.addressees li { display: flex; align-items: center; gap: 0.25rem; padding: 0.1rem 0; }
+.addr-title { flex: 1; color: var(--ehd-ink-2); }
 </style>

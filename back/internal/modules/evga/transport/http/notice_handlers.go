@@ -172,6 +172,7 @@ func (h *Handler) noticeList(c *fiber.Ctx) error {
 		SenderName:   c.Query("sendername"),
 		Recipient:    c.Query("recipient"),
 		StatusTitle:  c.Query("status_title"),
+		Department:   c.Query("department"), // «Отправитель» = департамент ДВГА (спека 022 FR-3)
 	}
 	items, total, scope, err := h.notices.List(c.UserContext(), identityFrom(c), f, page)
 	if err != nil {
