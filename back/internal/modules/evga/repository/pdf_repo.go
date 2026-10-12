@@ -33,7 +33,7 @@ func (rp *RegistryRepo) PDFData(ctx context.Context, noticeID int64, deptID *int
 			coalesce(cli.title,'') as recip_ru, coalesce(cli.title_kk, cli.title, '') as recip_kz,
 			coalesce(cli.code,'') as recip_code,
 			coalesce(d.title,'') as dept_title,
-			coalesce(nullif(trim(d.code),''), reg.region_code, '') as dept_code,
+			coalesce(nullif(trim(d.code),''), '') as dept_code,
 			`+fioExpr("su", "simp")+` as signer_name,
 			coalesce(sp.title,'') as signer_pos, coalesce(sp.title_kk, sp.title, '') as signer_pos_kz,
 			`+fioExpr("cu", "cimp")+` as exec_name,
@@ -43,8 +43,12 @@ func (rp *RegistryRepo) PDFData(ctx context.Context, noticeID int64, deptID *int
 		Joins(`left join its_risk_notice_recepient rc on rc.its_risk_notice_id = n.id and rc."in$trash" is null`).
 		Joins("left join its_cli cli on cli.id = rc.its_cli_id").
 		Joins("left join its_departments d on d.id = n.its_departments_id").
-		// код ДВГА: собственный код департамента, при его отсутствии — код региона
-		Joins(`left join its_regions reg on reg.id = d.its_regions_id and reg."in$trash" is null`).
+		// Код ДВГА — ТОЛЬКО собственный код департамента (its_departments.code).
+		// Прежний откат на region_code печатал в официальном документе код региона
+		// под видом кода ДВГА (у ДВГА по Жетісу выходило «код 19»). Спека 023.
+		// В боевой БД code заполнен у 18 из 22 департаментов (5-значный бюджетный код,
+		// напр. 30301, 35801); у 4 новых областей (в т.ч. Жетісу) кода нет — тогда
+		// код не печатается вовсе, как в утверждённом образце.
 		Joins("left join users su on su.id = n.signer_id").
 		// ФИО подписанта и исполнителя — из users_import (спека 022 FR-1): в боевой БД
 		// short_name пуст, и в официальный документ попадал бы логин
