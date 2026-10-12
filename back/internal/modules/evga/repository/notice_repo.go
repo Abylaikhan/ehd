@@ -366,6 +366,10 @@ func (nr *NoticeRepo) ListNotices(ctx context.Context, deptID *int64, f domain.N
 		if f.StatusTitle != "" {
 			q = q.Where("st.title ilike ?", "%"+f.StatusTitle+"%")
 		}
+		// «Отправитель» списка — департамент ДВГА (спека 022 FR-3)
+		if f.Department != "" {
+			q = q.Where("d.title ilike ?", "%"+f.Department+"%")
+		}
 		return q
 	}
 
@@ -454,9 +458,10 @@ func (nr *NoticeRepo) GetNotice(ctx context.Context, id int64, deptID *int64) (d
 		OutDocDate *time.Time
 	}
 	if err := nr.db.WithContext(ctx).Table("its_risk_notice n").
-		Select(`coalesce(u.short_name, u.login, '') as initiator,
+		Select(fioExpr("u", "imp")+` as initiator,
 			coalesce(o.doc_num,'') as out_doc_num, o.doc_date as out_doc_date`).
 		Joins(`left join users u on u.id = n.created_by`).
+		Joins(fioJoin("u", "imp")). // ФИО инициатора из users_import (спека 022 FR-1)
 		Joins(`left join its_out o on o.id = n.its_out_id`).
 		Where("n.id = ?", id).
 		Limit(1).Scan(&extra).Error; err != nil {

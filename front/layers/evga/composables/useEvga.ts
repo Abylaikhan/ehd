@@ -105,6 +105,7 @@ export function useEvga() {
   const noticeList = (p: {
     page?: number; page_size?: number; status_id?: number | null; docnum?: string
     department_id?: number | null; gu?: string; sendername?: string; recipient?: string; status_title?: string
+    department?: string // «Отправитель» = наименование департамента ДВГА (спека 022 FR-3)
   }) =>
     api<EvgaNoticeListResponse>('/api/v1/evga/notices', { query: toQuery(p as EvgaRegistryParams) })
 

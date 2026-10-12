@@ -82,7 +82,7 @@ func toRouteStepResp(s domain.RouteStep) routeStepResp {
 		AssigneeID: s.AssigneeObmID, AssigneeName: s.AssigneeName,
 		Status: s.Status, Result: s.Result, Comment: s.Comment,
 		OpenedAt: fmtT(s.OpenedAt), ClosedAt: fmtT(s.ClosedAt),
-		Signed:   s.SignedAt != nil, SignedAt: fmtT(s.SignedAt),
+		Signed: s.SignedAt != nil, SignedAt: fmtT(s.SignedAt),
 	}
 }
 

@@ -15,6 +15,13 @@ type ApprovalRepo struct{ db *gorm.DB }
 
 func NewApprovalRepo(db *gorm.DB) *ApprovalRepo { return &ApprovalRepo{db: db} }
 
+// Отображаемое имя сотрудника департамента — ФИО из users_import (спека 022 FR-1,
+// см. user_name.go): до этого аудитор видел в маршруте логины.
+var (
+	userNameJoin = fioJoin("u", "imp")
+	userNameExpr = fioExpr("u", "imp")
+)
+
 // NoticeMeta — данные уведомления для операций согласования.
 type NoticeMeta struct {
 	ID           int64
@@ -135,13 +142,17 @@ func (ar *ApprovalRepo) SetSigner(ctx context.Context, noticeID int64, signerObm
 // DeptUsers — сотрудники департамента для маршрута (FR-3): только с заполненным ИИН
 // (иначе не смогут действовать в ЕХД), живые записи.
 func (ar *ApprovalRepo) DeptUsers(ctx context.Context, deptID int64, q string) ([]domain.ObmUser, error) {
-	query := ar.db.WithContext(ctx).Table("users").
-		Select(`id, coalesce(short_name, login, '') as name, coalesce(login,'') as login`).
-		Where(`its_departments_id = ? and "in$trash" is null and coalesce(iin,'') <> ''`, deptID).
+	query := ar.db.WithContext(ctx).Table("users u").
+		Select(`u.id, `+userNameExpr+` as name, coalesce(u.login,'') as login`).
+		Joins(userNameJoin).
+		Where(`u.its_departments_id = ? and u."in$trash" is null and coalesce(u.iin,'') <> ''`, deptID).
 		Order("name").
 		Limit(30)
 	if q != "" {
-		query = query.Where("(short_name ilike ? or login ilike ?)", "%"+q+"%", "%"+q+"%")
+		// Поиск по видимому имени (FR-1) И по логину: аудитор ищет то ФИО, которое видит,
+		// но прежний поиск по логину/ИИН не теряется — иначе это была бы регрессия
+		// для тех, у кого ФИО уже подтянулось из users_import.
+		query = query.Where("("+userNameExpr+" ilike ? or u.login ilike ?)", "%"+q+"%", "%"+q+"%")
 	}
 	var rows []struct {
 		ID    int64
@@ -167,9 +178,10 @@ func (ar *ApprovalRepo) UserNames(ctx context.Context, ids []int64) (map[int64]s
 		ID   int64
 		Name string
 	}
-	err := ar.db.WithContext(ctx).Table("users").
-		Select(`id, coalesce(short_name, login, '') as name`).
-		Where("id in ?", ids).
+	err := ar.db.WithContext(ctx).Table("users u").
+		Select(`u.id, `+userNameExpr+` as name`).
+		Joins(userNameJoin).
+		Where("u.id in ?", ids).
 		Scan(&rows).Error
 	if err != nil {
 		return nil, err
