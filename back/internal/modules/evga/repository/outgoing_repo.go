@@ -117,7 +117,7 @@ func (or *OutgoingRepo) SetRegistrationData(ctx context.Context, noticeID int64,
 type RegisterResult struct {
 	Applied   bool // false — уже зарегистрировано ранее (FR-4)
 	Updated   int  // записей снимка переведено в статус 4
-	Cascaded  int  // записей-соседей по ppo_pp переведено в 4 (EVGA-FR-067а)
+	Cascaded  int  // всегда 0: каскад по платежу отключён (спека 021 отменяет EVGA-FR-067а)
 	ExecDue   string
 	OutDocNum string
 }
@@ -213,24 +213,11 @@ func (or *OutgoingRepo) Register(ctx context.Context, noticeID int64) (RegisterR
 			return err
 		}
 
-		// каскад по платежу: записи тех же ppo_pp других профилей (EVGA-FR-067а)
-		if len(ppo) > 0 {
-			var sibs []struct{ ID int64 }
-			if err := tx.Raw(
-				`select id from its_tb_5_15a
-				  where ppo_pp in ? and id not in ? and "in$trash" is null and its_risk_status_id = ?
-				  for update`, ppo, ids, domain.StatusInWork,
-			).Scan(&sibs).Error; err != nil {
-				return err
-			}
-			sibIDs := make([]int64, len(sibs))
-			for i, s := range sibs {
-				sibIDs[i] = s.ID
-			}
-			if res.Cascaded, err = apply(sibIDs); err != nil {
-				return err
-			}
-		}
+		// Каскад по платежу ОТКЛЮЧЁН (спека 021, отменяет EVGA-FR-067а).
+		// Записи других профилей того же платежа остаются в статусе «В работе у ДВГА»,
+		// поэтому по ним можно сформировать своё уведомление и отработать риск отдельно.
+		_ = ppo
+		res.Cascaded = 0
 
 		// контрольный срок: doc_date + 10 будних дней (№3-5) → its_out.exec_due_time
 		due := domain.AddBusinessDays(*m.DocDate, 10).Format("2006-01-02")

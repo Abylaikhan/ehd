@@ -111,7 +111,6 @@ func (sr *StatusRepo) ApplyStatusChange(
 			byID[r.ID] = r
 		}
 
-		changedPpo := map[string]bool{}
 		for _, id := range ids {
 			row, ok := byID[id]
 			if !ok {
@@ -126,39 +125,13 @@ func (sr *StatusRepo) ApplyStatusChange(
 			if err := applyOne(tx, row, targetStatus, attrs, changedBy, source); err != nil {
 				return err
 			}
-			if row.PpoPp != "" {
-				changedPpo[row.PpoPp] = true
-			}
 			outcomes = append(outcomes, ChangeOutcome{ID: id})
 		}
 
-		// каскад по платежу (спека 008 FR-14, ответ №3-1): та же смена применяется
-		// к записям того же ppo_pp других профилей, если их переход допустим;
-		// департамент не фильтруется — записи одного платежа принадлежат одному ДВГА.
-		if len(changedPpo) > 0 && source != domain.ChangeSourceSystem {
-			ppoList := make([]string, 0, len(changedPpo))
-			for p := range changedPpo {
-				ppoList = append(ppoList, p)
-			}
-			var siblings []lockedRow
-			err := tx.Table("its_tb_5_15a").
-				Select(`id, coalesce(ppo_pp,'') as ppo_pp, its_risk_status_id as status_id, amount_part::text as amount_part, amount_for_vozvrat::text as amount_for_vozvrat`).
-				Where(`ppo_pp in ? and id not in ? and "in$trash" is null`, ppoList, ids).
-				Clauses(forUpdate()).
-				Scan(&siblings).Error
-			if err != nil {
-				return err
-			}
-			for _, sib := range siblings {
-				if validateRow(sib, targetStatus, attrs) != nil {
-					continue // недопустимый переход соседа — не трогаем («старые записи не трогает»)
-				}
-				if err := applyOne(tx, sib, targetStatus, attrs, changedBy, domain.ChangeSourceSystem); err != nil {
-					return err
-				}
-				cascaded++
-			}
-		}
+		// Каскад по платежу ОТКЛЮЧЁН (спека 021). Проверка на боевой БД: 112 222 платежа
+		// (11% многопрофильных) уже имеют разные статусы по профилям — аудиторы отрабатывают
+		// риски одного платежа раздельно, и автоматическое выравнивание статусов этому мешает.
+		// Счётчик cascaded сохранён в контракте отчёта и всегда равен 0.
 		return nil
 	})
 	if err != nil {
