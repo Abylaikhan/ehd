@@ -14,13 +14,16 @@ import (
 // --- fakes ---
 
 type fakeNoticeRepo struct {
-	lastDept    *int64
-	lastOwner   int64
-	lastBy      *int64
-	lastGroups  []domain.CreateGroupInput
-	created     []domain.CreatedNotice
-	deleteErr   error
-	previewErrs []domain.RejectedRecord
+	// спека 024: последняя замена адресатов
+	lastRecipients []int64
+	recipientsErr  error
+	lastDept       *int64
+	lastOwner      int64
+	lastBy         *int64
+	lastGroups     []domain.CreateGroupInput
+	created        []domain.CreatedNotice
+	deleteErr      error
+	previewErrs    []domain.RejectedRecord
 }
 
 func (f *fakeNoticeRepo) Preview(_ context.Context, ids []int64, deptID *int64) ([]domain.NoticeGroup, []domain.RejectedRecord, error) {
@@ -39,6 +42,11 @@ func (f *fakeNoticeRepo) CreateNotices(_ context.Context, groups []domain.Create
 		f.created = []domain.CreatedNotice{{NoticeID: 100, GU: "111", Records: 2}}
 	}
 	return f.created, nil, nil
+}
+func (f *fakeNoticeRepo) SetRecipients(_ context.Context, _ int64, cliIDs []int64, deptID *int64) error {
+	f.lastDept = deptID
+	f.lastRecipients = cliIDs
+	return f.recipientsErr
 }
 func (f *fakeNoticeRepo) ListNotices(_ context.Context, deptID *int64, _ domain.NoticeFilter, _ domain.Page) ([]domain.NoticeListItem, int64, error) {
 	f.lastDept = deptID

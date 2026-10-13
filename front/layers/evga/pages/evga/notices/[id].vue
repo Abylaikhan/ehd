@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { EvgaCliOrg } from '~~/shared/api/types'
+
 // Карточка уведомления (спека 007-evga-notices-ui; backend 009 FR-8/9).
 // Проход 1 сближения с экраном платформы: степпер + табы + блок отправителя (спека 009-evga-outgoing-ui).
 definePageMeta({ middleware: 'auth' })
@@ -29,6 +31,48 @@ function refreshAll() {
 
 const header = computed(() => card.value?.header)
 const isDraft = computed(() => header.value?.status_id === 1)
+
+// Адресаты меняются ТОЛЬКО когда уведомление отправлено на доработку
+// (backend-спека 024 FR-1, ответ аналитика 13.10.2026). Бэкенд проверяет это повторно.
+const isRework = computed(() => header.value?.status_id === 12)
+const canEditRecipients = computed(() => canWrite.value && isRework.value)
+
+const recDraft = ref<EvgaCliOrg[]>([])
+const recSuggestions = ref<EvgaCliOrg[]>([])
+const recBusy = ref(false)
+watch(card, (c) => {
+  recDraft.value = (c?.recipients ?? []).map((r) => ({ id: r.cli_id, title: r.title, code: '', bin_iin: '' }))
+}, { immediate: true })
+
+async function searchRecCli(e: { query: string }) {
+  try {
+    recSuggestions.value = (await evga.cliSearch(e.query)).items
+  } catch {
+    recSuggestions.value = []
+  }
+}
+function moveRec(i: number, delta: number) {
+  const j = i + delta
+  if (j < 0 || j >= recDraft.value.length) return
+  const [item] = recDraft.value.splice(i, 1)
+  if (item) recDraft.value.splice(j, 0, item)
+}
+const recChanged = computed(() => {
+  const now = (card.value?.recipients ?? []).map((r) => r.cli_id).join(',')
+  return recDraft.value.map((c) => c.id).join(',') !== now
+})
+async function saveRecipients() {
+  recBusy.value = true
+  actionError.value = ''
+  try {
+    await evga.noticeSetRecipients(id.value, recDraft.value.map((c) => c.id))
+    refresh()
+  } catch (e) {
+    actionError.value = apiErrorMessage(e)
+  } finally {
+    recBusy.value = false
+  }
+}
 
 const errCode = computed(() => apiErrorCode(error.value))
 const screenState = computed(() => {
@@ -215,7 +259,34 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
                   <!-- адресаты с порядком (backend-спека 018) -->
                   <dt>Адресаты (ЕСЭДО)</dt>
                   <dd>
-                    <template v-if="card.recipients?.length">
+                    <!-- режим правки: только на доработке (спека 024 FR-3) -->
+                    <template v-if="canEditRecipients">
+                      <AutoComplete
+                        v-model="recDraft"
+                        multiple
+                        :suggestions="recSuggestions"
+                        option-label="title"
+                        placeholder="Поиск по наименованию или коду…"
+                        :min-length="2"
+                        fluid
+                        @complete="searchRecCli"
+                      />
+                      <ol v-if="recDraft.length > 1" class="rec-order">
+                        <li v-for="(c, i) in recDraft" :key="c.id">
+                          <span class="rec-title">{{ c.title }}</span>
+                          <Button icon="pi pi-arrow-up" text rounded size="small" aria-label="Переместить выше"
+                            :disabled="i === 0" @click="moveRec(i, -1)" />
+                          <Button icon="pi pi-arrow-down" text rounded size="small" aria-label="Переместить ниже"
+                            :disabled="i === recDraft.length - 1" @click="moveRec(i, 1)" />
+                        </li>
+                      </ol>
+                      <div class="rec-actions">
+                        <Button label="Сохранить адресатов" icon="pi pi-save" size="small" text
+                          :loading="recBusy" :disabled="!recChanged || recDraft.length === 0" @click="saveRecipients" />
+                        <span v-if="recDraft.length === 0" class="rec-hint">Нужен хотя бы один адресат.</span>
+                      </div>
+                    </template>
+                    <template v-else-if="card.recipients?.length">
                       <div v-for="r in card.recipients" :key="r.cli_id" class="recipient">
                         <span class="recipient-nn">{{ r.nn }}.</span> {{ r.title }}
                       </div>
@@ -364,6 +435,13 @@ const fio = (r: { fm: string; nm: string; ft: string }) => [r.fm, r.nm, r.ft].fi
 .props dd { margin: 0; color: var(--ehd-ink); font-size: 0.92rem; }
 .notice-text { margin: 0; line-height: 1.6; color: var(--ehd-ink); }
 .recipient { line-height: 1.5; }
+/* Правка адресатов на доработке (спека 024 FR-3) */
+.rec-order { margin: 0.4rem 0 0; padding-left: 1.4rem; font-size: 0.85rem; }
+.rec-order li { display: flex; align-items: center; gap: 0.25rem; padding: 0.1rem 0; }
+.rec-title { flex: 1; color: var(--ehd-ink-2); }
+.rec-actions { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.4rem; }
+.rec-hint { font-size: 0.8rem; color: var(--p-text-muted-color); }
+
 .recipient-nn { color: var(--ehd-ink-2); margin-right: 0.25rem; }
 .comment-block { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.4rem; }
 .comment-label { font-size: 0.88rem; color: var(--ehd-ink-2); }

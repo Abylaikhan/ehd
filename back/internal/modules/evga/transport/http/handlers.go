@@ -45,6 +45,11 @@ func mapErr(err error) error {
 	case errors.Is(err, domain.ErrNoticeNotEditable):
 		return httpserver.NewError(fiber.StatusUnprocessableEntity, "NOTICE_NOT_EDITABLE",
 			"Операция доступна только для уведомления в статусе «Проект создан»")
+	case errors.Is(err, domain.ErrRecipientsNotEditable):
+		return httpserver.NewError(fiber.StatusUnprocessableEntity, "RECIPIENTS_NOT_EDITABLE", err.Error())
+	case errors.Is(err, domain.ErrInvalidRecipients):
+		return httpserver.NewError(fiber.StatusBadRequest, "INVALID_RECIPIENTS", err.Error(),
+			httpserver.ErrorDetail{Field: "its_cli_ids", Reason: "empty_or_duplicate"})
 	case errors.Is(err, domain.ErrAddresseeRequired):
 		return httpserver.NewError(fiber.StatusBadRequest, "ADDRESSEE_REQUIRED", err.Error(),
 			httpserver.ErrorDetail{Field: "its_cli_id", Reason: "required"})
