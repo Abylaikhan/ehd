@@ -258,3 +258,23 @@ func (h *Handler) noticeDelete(c *fiber.Ctx) error {
 	}
 	return c.JSON(fiber.Map{"deleted": true})
 }
+
+// noticeSetRecipients — PUT /notices/:id/recipients (спека 024 FR-2).
+// Порядок в its_cli_ids значим: позиция = nn адресата.
+func (h *Handler) noticeSetRecipients(c *fiber.Ctx) error {
+	id, err := strconv.ParseInt(c.Params("id"), 10, 64)
+	if err != nil {
+		return httpserver.NewError(fiber.StatusBadRequest, "INVALID_FILTER", "Некорректный идентификатор",
+			httpserver.ErrorDetail{Field: "id", Reason: "not_an_integer"})
+	}
+	var body struct {
+		ItsCliIDs []int64 `json:"its_cli_ids"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return httpserver.NewError(fiber.StatusBadRequest, "INVALID_BODY", "Некорректное тело запроса")
+	}
+	if err := h.notices.SetRecipients(c.UserContext(), identityFrom(c), id, body.ItsCliIDs); err != nil {
+		return mapErr(err)
+	}
+	return c.JSON(fiber.Map{"updated": true, "count": len(body.ItsCliIDs)})
+}

@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // Статусы заявки уведомления в платформенном справочнике its_req_stat
 // (снято с прода, 14-shema-bd.md; «Исполнен» из ТЗ = «Отправлен объекту аудита»).
@@ -143,4 +146,23 @@ type NoticeRow struct {
 	GU          string
 	GUBIN       string
 	SenderName  string
+}
+
+// ValidateRecipientIDs — проверка списка адресатов при замене на доработке (спека 024 FR-2).
+// Уведомление без адресата недопустимо; дубликат адресата — ошибка ввода, а не повтор nn.
+func ValidateRecipientIDs(ids []int64) error {
+	if len(ids) == 0 {
+		return fmt.Errorf("%w: не указан ни один адресат", ErrInvalidRecipients)
+	}
+	seen := make(map[int64]bool, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			return fmt.Errorf("%w: некорректный идентификатор адресата", ErrInvalidRecipients)
+		}
+		if seen[id] {
+			return fmt.Errorf("%w: адресат указан дважды", ErrInvalidRecipients)
+		}
+		seen[id] = true
+	}
+	return nil
 }

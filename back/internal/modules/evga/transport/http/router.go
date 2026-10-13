@@ -29,7 +29,8 @@ func Register(r fiber.Router, h *Handler, guard *Guard) {
 	user.Get("/notices", h.noticeList)
 	user.Get("/notices/:id", h.noticeGet)
 	user.Delete("/notices/:id", h.noticeDelete)
-	user.Put("/notices/:id/comment", h.noticeSetComment) // спека 018
+	user.Put("/notices/:id/comment", h.noticeSetComment)       // спека 018
+	user.Put("/notices/:id/recipients", h.noticeSetRecipients) // спека 024: адресаты на доработке
 	user.Get("/cli", h.cliSearch)
 
 	// согласование и маршрут (спека 010)

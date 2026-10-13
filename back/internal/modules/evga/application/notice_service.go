@@ -18,6 +18,8 @@ type NoticeRepoPort interface {
 	ListNotices(ctx context.Context, deptID *int64, f domain.NoticeFilter, page domain.Page) ([]domain.NoticeListItem, int64, error)
 	GetNotice(ctx context.Context, id int64, deptID *int64) (domain.NoticeCard, error)
 	DeleteNotice(ctx context.Context, id int64, deptID *int64) error
+	// SetRecipients — замена состава адресатов на доработке (спека 024 FR-2)
+	SetRecipients(ctx context.Context, id int64, cliIDs []int64, deptID *int64) error
 }
 
 // UserResolver — id пользователя obm_evga по ИИН (реализует StatusRepo).
@@ -221,5 +223,24 @@ func (s *NoticeService) Delete(ctx context.Context, id contract.Identity, notice
 		return err
 	}
 	s.log.Info("evga: notice draft deleted", zap.Int64("notice_id", noticeID), zap.String("user_id", id.UserID))
+	return nil
+}
+
+// SetRecipients — замена состава и порядка адресатов (спека 024).
+// Репозиторий сам проверяет статус «Отправлен на доработку»: проверка должна быть
+// внутри той же транзакции, что и запись, иначе статус успеет измениться.
+func (s *NoticeService) SetRecipients(ctx context.Context, id contract.Identity, noticeID int64, cliIDs []int64) error {
+	if err := domain.ValidateRecipientIDs(cliIDs); err != nil {
+		return err
+	}
+	deptID, _, _, err := s.auditorScope(ctx, id, true)
+	if err != nil {
+		return err
+	}
+	if err := s.repo.SetRecipients(ctx, noticeID, cliIDs, deptID); err != nil {
+		return err
+	}
+	s.log.Info("evga: notice recipients replaced",
+		zap.Int64("notice_id", noticeID), zap.Int("count", len(cliIDs)), zap.String("user_id", id.UserID))
 	return nil
 }

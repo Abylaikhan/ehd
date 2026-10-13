@@ -539,3 +539,46 @@ func (nr *NoticeRepo) DeleteNotice(ctx context.Context, id int64, deptID *int64)
 		return nil
 	})
 }
+
+// SetRecipients — полная замена состава адресатов уведомления (спека 024 FR-1/FR-2).
+// Разрешено ТОЛЬКО в статусе «Отправлен на доработку»: ответ аналитика 13.10.2026.
+// Прежние строки гасятся in$trash = 1 (не удаляются), новые получают nn = 1..N
+// в переданном порядке — он же определяет последовательность в PDF и в списке.
+func (nr *NoticeRepo) SetRecipients(ctx context.Context, id int64, cliIDs []int64, deptID *int64) error {
+	return nr.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		q := tx.Table("its_risk_notice n").
+			Select("n.id, rq.stat_id").
+			Joins("left join its_req rq on rq.id = n.req_id").
+			Where(`n.id = ? and n."in$trash" is null`, id).
+			Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "n"}})
+		if deptID != nil {
+			q = q.Where("n.its_departments_id = ?", *deptID)
+		}
+		var rows []struct {
+			ID     int64
+			StatID *int64
+		}
+		if err := q.Scan(&rows).Error; err != nil {
+			return err
+		}
+		if len(rows) == 0 {
+			return domain.ErrNotFound
+		}
+		if rows[0].StatID == nil || *rows[0].StatID != domain.ReqStatRework {
+			return domain.ErrRecipientsNotEditable
+		}
+		if err := tx.Exec(
+			`update its_risk_notice_recepient set "in$trash" = 1
+			  where its_risk_notice_id = ? and "in$trash" is null`, id).Error; err != nil {
+			return err
+		}
+		for i, cliID := range cliIDs {
+			if err := tx.Exec(
+				`insert into its_risk_notice_recepient (its_risk_notice_id, its_cli_id, nn) values (?, ?, ?)`,
+				id, cliID, i+1).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
